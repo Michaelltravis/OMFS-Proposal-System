@@ -108,7 +108,9 @@ class ContentVersionResponse(BaseModel):
     version_number: int
     title: str
     content: str
+    section_type: Optional[str] = None
     context_metadata: Optional[Dict[str, Any]] = None
+    tags_snapshot: Optional[List[Dict[str, Any]]] = None
     change_description: Optional[str] = None
     created_at: datetime
     created_by: Optional[str] = None

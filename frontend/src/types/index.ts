@@ -52,7 +52,9 @@ export interface ContentVersion {
   version_number: number;
   title: string;
   content: string;
+  section_type?: string;
   context_metadata?: Record<string, any>;
+  tags_snapshot?: Array<{id: number; name: string; color?: string}>;
   change_description?: string;
   created_at: string;
   created_by?: string;
