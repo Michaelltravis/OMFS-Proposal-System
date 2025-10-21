@@ -16,6 +16,8 @@ from app.schemas.content import (
     SearchParams,
     AIGenerateRequest,
     AIGenerateResponse,
+    AcceptRejectChangeRequest,
+    AcceptRejectChangeResponse,
 )
 from app.schemas.common import PaginatedResponse
 from sqlalchemy import or_, and_
@@ -284,3 +286,115 @@ async def generate_content_with_ai(
             status_code=500,
             detail=f"AI generation failed: {str(e)}"
         )
+
+
+# Track Changes
+@router.post("/blocks/{block_id}/track-changes/accept-reject", response_model=AcceptRejectChangeResponse)
+def accept_reject_changes(
+    block_id: int,
+    request: AcceptRejectChangeRequest,
+    db: Session = Depends(get_db),
+):
+    """Accept or reject tracked changes in a content block"""
+    from bs4 import BeautifulSoup
+    import re
+
+    block = db.query(ContentBlock).filter(
+        ContentBlock.id == block_id,
+        ContentBlock.is_deleted == False
+    ).first()
+
+    if not block:
+        raise HTTPException(status_code=404, detail="Content block not found")
+
+    if request.action not in ["accept", "reject"]:
+        raise HTTPException(status_code=400, detail="Action must be 'accept' or 'reject'")
+
+    # Parse the HTML content
+    soup = BeautifulSoup(block.content, 'html.parser')
+
+    # Get current metadata
+    metadata = block.tracked_changes_metadata or {"changes": []}
+    changes_list = metadata.get("changes", [])
+
+    # Process each change
+    for change_id in request.change_ids:
+        # Find the change in metadata
+        change_meta = next((c for c in changes_list if c.get("id") == change_id), None)
+        if not change_meta:
+            continue
+
+        # Find all elements with this change ID
+        change_elements = soup.find_all(attrs={"data-change-id": change_id})
+
+        for element in change_elements:
+            change_type = element.get("data-change-type")
+
+            if request.action == "accept":
+                # Accept the change
+                if change_type == "insert":
+                    # Keep the text, remove the mark
+                    element.unwrap()
+                elif change_type == "delete":
+                    # Remove the deleted text entirely
+                    element.decompose()
+
+                # Update metadata status
+                if change_meta:
+                    change_meta["status"] = "accepted"
+
+            elif request.action == "reject":
+                # Reject the change
+                if change_type == "insert":
+                    # Remove the inserted text
+                    element.decompose()
+                elif change_type == "delete":
+                    # Restore the deleted text (remove the mark)
+                    element.unwrap()
+
+                # Update metadata status
+                if change_meta:
+                    change_meta["status"] = "rejected"
+
+    # Remove accepted/rejected changes from metadata
+    metadata["changes"] = [c for c in changes_list if c.get("status") == "pending"]
+
+    # Update the block
+    block.content = str(soup)
+    block.tracked_changes_metadata = metadata
+
+    db.commit()
+    db.refresh(block)
+
+    return AcceptRejectChangeResponse(
+        success=True,
+        content=block.content,
+        tracked_changes_metadata=metadata
+    )
+
+
+@router.post("/blocks/{block_id}/track-changes/toggle", response_model=ContentBlockResponse)
+def toggle_track_changes(
+    block_id: int,
+    enabled: bool,
+    db: Session = Depends(get_db),
+):
+    """Enable or disable track changes mode for a content block"""
+    block = db.query(ContentBlock).filter(
+        ContentBlock.id == block_id,
+        ContentBlock.is_deleted == False
+    ).first()
+
+    if not block:
+        raise HTTPException(status_code=404, detail="Content block not found")
+
+    block.track_changes_enabled = enabled
+
+    # Initialize metadata if enabling for first time
+    if enabled and not block.tracked_changes_metadata:
+        block.tracked_changes_metadata = {"changes": []}
+
+    db.commit()
+    db.refresh(block)
+
+    return block

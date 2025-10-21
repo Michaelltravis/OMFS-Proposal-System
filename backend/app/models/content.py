@@ -65,6 +65,22 @@ class ContentBlock(Base):
     # [{proposal: "City of Houston", date: "2023-05", changes: "...", level: "heavy"}, ...]
     customization_history = Column(JSON, default=list)
 
+    # Track Changes - Microsoft Word-like change tracking
+    track_changes_enabled = Column(Boolean, default=False)  # Whether track changes is currently active
+    tracked_changes_metadata = Column(JSON, default=dict)  # Metadata about pending changes
+    # Format: {
+    #   "changes": [
+    #     {
+    #       "id": "change_uuid",
+    #       "type": "insert"|"delete",
+    #       "user": "User Name",
+    #       "user_id": "user@email.com",
+    #       "timestamp": "ISO datetime",
+    #       "status": "pending"|"accepted"|"rejected"
+    #     }
+    #   ]
+    # }
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

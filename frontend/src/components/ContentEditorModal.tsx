@@ -2,10 +2,11 @@
  * Content Editor Modal - Create and edit content blocks with Claude AI assistance
  */
 import { useState } from 'react';
-import { X, Sparkles, Loader2, Save } from 'lucide-react';
+import { X, Sparkles, Loader2, Save, GitBranch } from 'lucide-react';
 import { RichTextEditor } from './common/RichTextEditor';
+import { TrackChangesPanel } from './TrackChangesPanel';
 import { contentService } from '../services/contentService';
-import type { ContentBlock } from '../types';
+import type { ContentBlock, TrackedChange } from '../types';
 
 interface ContentEditorModalProps {
   block?: ContentBlock | null;
@@ -21,6 +22,13 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showClaudePanel, setShowClaudePanel] = useState(false);
+
+  // Track Changes state
+  const [trackChangesEnabled, setTrackChangesEnabled] = useState(block?.track_changes_enabled || false);
+  const [trackedChanges, setTrackedChanges] = useState<TrackedChange[]>(
+    block?.tracked_changes_metadata?.changes || []
+  );
+  const [currentUser] = useState({ name: 'Current User', id: 'user@example.com' });
 
   const sectionTypes = [
     { value: 'technical_approach', label: 'Technical Approach' },
@@ -39,6 +47,10 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
         section_type: sectionType,
         content,
         quality_rating: block?.quality_rating || 3.0,
+        track_changes_enabled: trackChangesEnabled,
+        tracked_changes_metadata: {
+          changes: trackedChanges,
+        },
       };
 
       if (block?.id) {
@@ -55,6 +67,118 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
       alert('Failed to save content block. Please try again.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleToggleTrackChanges = async () => {
+    if (!block?.id) {
+      // For new blocks, just toggle locally
+      setTrackChangesEnabled(!trackChangesEnabled);
+      if (!trackChangesEnabled) {
+        setTrackedChanges([]);
+      }
+      return;
+    }
+
+    try {
+      const response = await contentService.toggleTrackChanges(block.id, !trackChangesEnabled);
+      setTrackChangesEnabled(response.track_changes_enabled || false);
+      if (!response.track_changes_enabled) {
+        setTrackedChanges([]);
+      }
+    } catch (error) {
+      console.error('Error toggling track changes:', error);
+      alert('Failed to toggle track changes. Please try again.');
+    }
+  };
+
+  const handleTrackChange = (
+    changeId: string,
+    changeType: 'insert' | 'delete',
+    user: string,
+    userId: string,
+    timestamp: string
+  ) => {
+    const newChange: TrackedChange = {
+      id: changeId,
+      type: changeType,
+      user,
+      user_id: userId,
+      timestamp,
+      status: 'pending',
+    };
+    setTrackedChanges((prev) => [...prev, newChange]);
+  };
+
+  const handleAcceptChange = async (changeId: string) => {
+    if (!block?.id) {
+      // For new blocks, just remove from local state
+      setTrackedChanges((prev) => prev.filter((c) => c.id !== changeId));
+      return;
+    }
+
+    try {
+      const response = await contentService.acceptRejectChanges(block.id, [changeId], 'accept');
+      setContent(response.content);
+      setTrackedChanges(response.tracked_changes_metadata.changes);
+    } catch (error) {
+      console.error('Error accepting change:', error);
+      alert('Failed to accept change. Please try again.');
+    }
+  };
+
+  const handleRejectChange = async (changeId: string) => {
+    if (!block?.id) {
+      // For new blocks, just remove from local state
+      setTrackedChanges((prev) => prev.filter((c) => c.id !== changeId));
+      return;
+    }
+
+    try {
+      const response = await contentService.acceptRejectChanges(block.id, [changeId], 'reject');
+      setContent(response.content);
+      setTrackedChanges(response.tracked_changes_metadata.changes);
+    } catch (error) {
+      console.error('Error rejecting change:', error);
+      alert('Failed to reject change. Please try again.');
+    }
+  };
+
+  const handleAcceptAll = async () => {
+    const pendingChangeIds = trackedChanges.filter((c) => c.status === 'pending').map((c) => c.id);
+    if (pendingChangeIds.length === 0) return;
+
+    if (!block?.id) {
+      setTrackedChanges([]);
+      return;
+    }
+
+    try {
+      const response = await contentService.acceptRejectChanges(block.id, pendingChangeIds, 'accept');
+      setContent(response.content);
+      setTrackedChanges(response.tracked_changes_metadata.changes);
+    } catch (error) {
+      console.error('Error accepting all changes:', error);
+      alert('Failed to accept all changes. Please try again.');
+    }
+  };
+
+  const handleRejectAll = async () => {
+    const pendingChangeIds = trackedChanges.filter((c) => c.status === 'pending').map((c) => c.id);
+    if (pendingChangeIds.length === 0) return;
+
+    if (!block?.id) {
+      setTrackedChanges([]);
+      return;
+    }
+
+    try {
+      const response = await contentService.acceptRejectChanges(block.id, pendingChangeIds, 'reject');
+      setContent(response.content);
+      setTrackedChanges(response.tracked_changes_metadata.changes);
+    } catch (error) {
+      console.error('Error rejecting all changes:', error);
+      alert('Failed to reject all changes. Please try again.');
     }
   };
 
@@ -110,6 +234,29 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
 
         {/* Modal Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Track Changes Toggle */}
+          <div className="mb-4 flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <GitBranch className="w-5 h-5 text-blue-600" />
+              <span className="font-medium text-gray-900">Track Changes</span>
+              {trackChangesEnabled && (
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                  Active
+                </span>
+              )}
+            </div>
+            <button
+              onClick={handleToggleTrackChanges}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                trackChangesEnabled
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              {trackChangesEnabled ? 'Enabled' : 'Disabled'}
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Editor - Left 2/3 */}
             <div className="lg:col-span-2 space-y-4">
@@ -155,8 +302,24 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
                   onChange={setContent}
                   placeholder="Start typing or use Claude AI to draft content..."
                   editable={true}
+                  trackChangesEnabled={trackChangesEnabled}
+                  currentUser={currentUser}
+                  onTrackChange={handleTrackChange}
                 />
               </div>
+
+              {/* Track Changes Panel */}
+              {trackChangesEnabled && trackedChanges.length > 0 && (
+                <div>
+                  <TrackChangesPanel
+                    changes={trackedChanges}
+                    onAcceptChange={handleAcceptChange}
+                    onRejectChange={handleRejectChange}
+                    onAcceptAll={handleAcceptAll}
+                    onRejectAll={handleRejectAll}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Claude AI Panel - Right 1/3 */}

@@ -52,6 +52,8 @@ class ContentBlockUpdate(BaseModel):
     context_metadata: Optional[Dict[str, Any]] = None
     quality_rating: Optional[float] = Field(None, ge=0, le=5)
     tag_ids: Optional[List[int]] = None
+    track_changes_enabled: Optional[bool] = None
+    tracked_changes_metadata: Optional[Dict[str, Any]] = None
 
 
 class CustomizationHistoryEntry(BaseModel):
@@ -66,6 +68,8 @@ class ContentBlockResponse(ContentBlockBase):
     document_source_id: Optional[int] = None
     usage_count: int
     customization_history: List[Dict[str, Any]] = []
+    track_changes_enabled: bool = False
+    tracked_changes_metadata: Dict[str, Any] = {}
     created_at: datetime
     updated_at: Optional[datetime] = None
     created_by: Optional[str] = None
@@ -119,3 +123,24 @@ class AIGenerateResponse(BaseModel):
     content: str = Field(..., description="Generated HTML content")
     action: str
     section_type: str
+
+
+# Track Changes Schemas
+class TrackChangeData(BaseModel):
+    id: str
+    type: str  # 'insert' or 'delete'
+    user: str
+    user_id: str
+    timestamp: str
+    status: str = 'pending'  # 'pending', 'accepted', 'rejected'
+
+
+class AcceptRejectChangeRequest(BaseModel):
+    change_ids: List[str] = Field(..., description="List of change IDs to accept or reject")
+    action: str = Field(..., description="Either 'accept' or 'reject'")
+
+
+class AcceptRejectChangeResponse(BaseModel):
+    success: bool
+    content: str = Field(..., description="Updated HTML content with changes applied")
+    tracked_changes_metadata: Dict[str, Any]

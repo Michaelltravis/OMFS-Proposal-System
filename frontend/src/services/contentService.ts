@@ -8,6 +8,7 @@ import type {
   SearchParams,
   PaginatedResponse,
   ContentVersion,
+  TrackedChangesMetadata,
 } from '../types';
 
 export const contentService = {
@@ -92,6 +93,24 @@ export const contentService = {
     return apiClient.post<{ content: string; action: string; section_type: string }>(
       '/api/content/ai/generate',
       data
+    );
+  },
+
+  // Track Changes
+  toggleTrackChanges: async (blockId: number, enabled: boolean) => {
+    return apiClient.post<ContentBlock>(`/api/content/blocks/${blockId}/track-changes/toggle`, null, {
+      params: { enabled },
+    });
+  },
+
+  acceptRejectChanges: async (
+    blockId: number,
+    changeIds: string[],
+    action: 'accept' | 'reject'
+  ) => {
+    return apiClient.post<{ success: boolean; content: string; tracked_changes_metadata: TrackedChangesMetadata }>(
+      `/api/content/blocks/${blockId}/track-changes/accept-reject`,
+      { change_ids: changeIds, action }
     );
   },
 };
