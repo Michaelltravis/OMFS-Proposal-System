@@ -121,12 +121,17 @@ def update_content_block(
         raise HTTPException(status_code=404, detail="Content block not found")
 
     # Create version snapshot before updating
+    # Capture current tags
+    tags_snapshot = [{"id": tag.id, "name": tag.name, "color": tag.color} for tag in block.tags]
+
     version = ContentVersion(
         content_block_id=block.id,
         version_number=len(block.versions) + 1,
         title=block.title,
         content=block.content,
+        section_type=block.section_type,
         context_metadata=block.context_metadata,
+        tags_snapshot=tags_snapshot,
         change_description="Auto-saved version before update",
     )
     db.add(version)
@@ -219,12 +224,17 @@ def revert_to_version(
         raise HTTPException(status_code=404, detail="Version not found")
 
     # Create a new version with current state before reverting
+    # Capture current tags
+    tags_snapshot = [{"id": tag.id, "name": tag.name, "color": tag.color} for tag in block.tags]
+
     new_version = ContentVersion(
         content_block_id=block.id,
         version_number=len(block.versions) + 1,
         title=block.title,
         content=block.content,
+        section_type=block.section_type,
         context_metadata=block.context_metadata,
+        tags_snapshot=tags_snapshot,
         change_description=f"Auto-saved before reverting to version {version.version_number}",
     )
     db.add(new_version)
@@ -232,7 +242,15 @@ def revert_to_version(
     # Revert to selected version
     block.title = version.title
     block.content = version.content
+    block.section_type = version.section_type if version.section_type else block.section_type
     block.context_metadata = version.context_metadata
+
+    # Revert tags if snapshot exists
+    if version.tags_snapshot:
+        # Get tag objects from the snapshot
+        tag_ids = [tag_data["id"] for tag_data in version.tags_snapshot]
+        tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+        block.tags = tags
 
     db.commit()
     db.refresh(block)

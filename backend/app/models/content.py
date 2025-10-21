@@ -119,7 +119,9 @@ class ContentVersion(Base):
     version_number = Column(Integer, nullable=False)
     title = Column(String(500), nullable=False)
     content = Column(Text, nullable=False)
+    section_type = Column(String(100), nullable=True)  # Track section type changes
     context_metadata = Column(JSON, nullable=True)
+    tags_snapshot = Column(JSON, nullable=True)  # Store tag IDs and names at time of version
 
     change_description = Column(Text, nullable=True)  # What changed
     created_at = Column(DateTime(timezone=True), server_default=func.now())
