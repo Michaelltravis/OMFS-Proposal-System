@@ -12,22 +12,56 @@ import * as DiffMatchPatch from 'diff-match-patch';
 export const RepositoryPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTab, setSelectedTab] = useState('all');
-  const [selectedSectionType, setSelectedSectionType] = useState<string | null>(null);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  // Pending filters (not yet applied)
+  const [pendingSectionType, setPendingSectionType] = useState<string | null>(null);
+  const [pendingTags, setPendingTags] = useState<string[]>([]);
+
+  // Applied filters (used in API query)
+  const [appliedSectionType, setAppliedSectionType] = useState<string | null>(null);
+  const [appliedTags, setAppliedTags] = useState<string[]>([]);
+
+  const [tagSearchQuery, setTagSearchQuery] = useState('');
+  const [sectionTypeSearchQuery, setSectionTypeSearchQuery] = useState('');
   const [selectedBlock, setSelectedBlock] = useState<ContentBlock | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
 
-  // Fetch content blocks
+  const queryClient = useQueryClient();
+
+  // Handler for when content is saved
+  const handleContentSaved = () => {
+    // Invalidate both content blocks and tags queries to refresh with new data
+    queryClient.invalidateQueries({ queryKey: ['content-blocks'] });
+    queryClient.invalidateQueries({ queryKey: ['tags'] });
+    setIsEditorOpen(false);
+    setEditingBlock(null);
+  };
+
+  // Fetch content blocks with applied filters
   const { data, isLoading } = useQuery({
-    queryKey: ['content-blocks', { query: searchQuery, section_type: selectedSectionType, tags: selectedTags }],
+    queryKey: ['content-blocks', { query: searchQuery, section_type: appliedSectionType, tags: appliedTags }],
     queryFn: () =>
       contentService.getContentBlocks({
         query: searchQuery || undefined,
-        section_type: selectedSectionType || undefined,
-        tags: selectedTags.length > 0 ? selectedTags : undefined,
+        section_type: appliedSectionType || undefined,
+        tags: appliedTags.length > 0 ? appliedTags : undefined,
       }),
   });
+
+  // Apply filters handler
+  const applyFilters = () => {
+    setAppliedSectionType(pendingSectionType);
+    setAppliedTags(pendingTags);
+  };
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setPendingSectionType(null);
+    setPendingTags([]);
+    setAppliedSectionType(null);
+    setAppliedTags([]);
+  };
 
   // Fetch available tags
   const { data: availableTags } = useQuery({
@@ -68,30 +102,49 @@ export const RepositoryPage = () => {
           {/* Section Type Filter */}
           <div className="mb-6">
             <h3 className="text-sm font-medium text-gray-700 mb-2">Section Type</h3>
+            {/* Section Type Search Input */}
+            <div className="mb-2">
+              <input
+                type="text"
+                placeholder="Search section types..."
+                value={sectionTypeSearchQuery}
+                onChange={(e) => setSectionTypeSearchQuery(e.target.value)}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
             <div className="space-y-1">
               <button
-                onClick={() => setSelectedSectionType(null)}
+                onClick={() => setPendingSectionType(null)}
                 className={`w-full text-left px-3 py-2 rounded text-sm ${
-                  selectedSectionType === null
+                  pendingSectionType === null
                     ? 'bg-primary-50 text-primary-700'
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 All Types
               </button>
-              {sectionTypes.map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setSelectedSectionType(type)}
-                  className={`w-full text-left px-3 py-2 rounded text-sm capitalize ${
-                    selectedSectionType === type
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {type.replace('_', ' ')}
-                </button>
-              ))}
+              {sectionTypes
+                .filter((type) =>
+                  type.toLowerCase().replace('_', ' ').includes(sectionTypeSearchQuery.toLowerCase())
+                )
+                .map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setPendingSectionType(type)}
+                    className={`w-full text-left px-3 py-2 rounded text-sm capitalize ${
+                      pendingSectionType === type
+                        ? 'bg-primary-50 text-primary-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {type.replace('_', ' ')}
+                  </button>
+                ))}
+              {sectionTypes.filter((type) =>
+                type.toLowerCase().replace('_', ' ').includes(sectionTypeSearchQuery.toLowerCase())
+              ).length === 0 && sectionTypeSearchQuery && (
+                <div className="text-sm text-gray-500 px-3 py-2 text-center">No matching types</div>
+              )}
             </div>
           </div>
 
@@ -99,46 +152,78 @@ export const RepositoryPage = () => {
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-700">Tags</h3>
-              {selectedTags.length > 0 && (
+              {pendingTags.length > 0 && (
                 <button
-                  onClick={() => setSelectedTags([])}
+                  onClick={() => setPendingTags([])}
                   className="text-xs text-primary-600 hover:text-primary-700"
                 >
                   Clear
                 </button>
               )}
             </div>
+            {/* Tag Search Input */}
+            <div className="mb-2">
+              <input
+                type="text"
+                placeholder="Search tags..."
+                value={tagSearchQuery}
+                onChange={(e) => setTagSearchQuery(e.target.value)}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {availableTags && availableTags.length > 0 ? (
-                availableTags.map((tag) => (
-                  <label
-                    key={tag.id}
-                    className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedTags.includes(tag.name)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedTags([...selectedTags, tag.name]);
-                        } else {
-                          setSelectedTags(selectedTags.filter((t) => t !== tag.name));
-                        }
-                      }}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: tag.color || '#6B7280' }}
-                    />
-                    <span className="text-sm text-gray-700 flex-1">{tag.name}</span>
-                    <span className="text-xs text-gray-500">{tag.usage_count || 0}</span>
-                  </label>
-                ))
+                availableTags
+                  .filter((tag) =>
+                    tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase())
+                  )
+                  .map((tag) => (
+                    <label
+                      key={tag.id}
+                      className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={pendingTags.includes(tag.name)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setPendingTags([...pendingTags, tag.name]);
+                          } else {
+                            setPendingTags(pendingTags.filter((t) => t !== tag.name));
+                          }
+                        }}
+                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: tag.color || '#6B7280' }}
+                      />
+                      <span className="text-sm text-gray-700 flex-1">{tag.name}</span>
+                      <span className="text-xs text-gray-500">{tag.usage_count || 0}</span>
+                    </label>
+                  ))
               ) : (
                 <div className="text-sm text-gray-500 px-3 py-2">No tags available</div>
               )}
             </div>
+          </div>
+
+          {/* Apply Filters Button */}
+          <div className="mt-6 space-y-2">
+            <button
+              onClick={applyFilters}
+              className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
+            >
+              Apply Filters
+            </button>
+            {(appliedSectionType !== null || appliedTags.length > 0) && (
+              <button
+                onClick={clearAllFilters}
+                className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Clear All Filters
+              </button>
+            )}
           </div>
         </div>
       </aside>
@@ -213,8 +298,33 @@ export const RepositoryPage = () => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 text-gray-500">
-              No content blocks found. Create your first one!
+            <div className="text-center py-12">
+              <div className="text-gray-400 mb-2">
+                <Filter className="w-12 h-12 mx-auto mb-3" />
+              </div>
+              {(appliedSectionType !== null || appliedTags.length > 0 || searchQuery.trim() !== '') ? (
+                <div>
+                  <p className="text-gray-700 font-medium mb-1">No content blocks found</p>
+                  <p className="text-gray-500 text-sm">
+                    Try adjusting your filters or search criteria
+                  </p>
+                  {(appliedSectionType !== null || appliedTags.length > 0) && (
+                    <button
+                      onClick={clearAllFilters}
+                      className="mt-4 px-4 py-2 text-sm text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg"
+                    >
+                      Clear all filters
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <p className="text-gray-700 font-medium mb-1">No content blocks yet</p>
+                  <p className="text-gray-500 text-sm">
+                    Create your first content block to get started
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -241,12 +351,7 @@ export const RepositoryPage = () => {
             setIsEditorOpen(false);
             setEditingBlock(null);
           }}
-          onSave={() => {
-            setIsEditorOpen(false);
-            setEditingBlock(null);
-            // Refresh the content list
-            window.location.reload();
-          }}
+          onSave={handleContentSaved}
         />
       )}
     </div>

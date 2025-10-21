@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git switch:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(python -m uvicorn:*)",
+      "Bash(timeout 3 bash:*)",
+      "Bash(npm run dev:*)",
+      "Bash(ping:*)",
+      "Bash(python:*)",
+      "Bash(timeout 5 bash:*)",
+      "Bash(curl:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

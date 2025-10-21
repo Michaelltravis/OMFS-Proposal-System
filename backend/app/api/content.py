@@ -103,6 +103,11 @@ def create_content_block(
         tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
         content_block.tags = tags
 
+        # Increment usage_count for each tag
+        for tag in tags:
+            tag.usage_count = (tag.usage_count or 0) + 1
+            db.add(tag)  # Explicitly mark tag as modified
+
     db.add(content_block)
     db.commit()
     db.refresh(content_block)
@@ -143,6 +148,27 @@ def update_content_block(
 
     # Update tags if provided
     if hasattr(block_data, 'tag_ids') and block_data.tag_ids is not None:
+        # Get old and new tag IDs
+        old_tag_ids = set(tag.id for tag in block.tags)
+        new_tag_ids = set(block_data.tag_ids)
+
+        # Find tags being removed and decrement their usage_count
+        removed_tag_ids = old_tag_ids - new_tag_ids
+        if removed_tag_ids:
+            removed_tags = db.query(Tag).filter(Tag.id.in_(removed_tag_ids)).all()
+            for tag in removed_tags:
+                tag.usage_count = max(0, (tag.usage_count or 0) - 1)
+                db.add(tag)  # Explicitly mark tag as modified
+
+        # Find tags being added and increment their usage_count
+        added_tag_ids = new_tag_ids - old_tag_ids
+        if added_tag_ids:
+            added_tags = db.query(Tag).filter(Tag.id.in_(added_tag_ids)).all()
+            for tag in added_tags:
+                tag.usage_count = (tag.usage_count or 0) + 1
+                db.add(tag)  # Explicitly mark tag as modified
+
+        # Update the block's tags
         tags = db.query(Tag).filter(Tag.id.in_(block_data.tag_ids)).all()
         block.tags = tags
 
@@ -160,6 +186,11 @@ def delete_content_block(block_id: int, db: Session = Depends(get_db)):
     if not block:
         raise HTTPException(status_code=404, detail="Content block not found")
 
+    # Decrement usage_count for all associated tags
+    for tag in block.tags:
+        tag.usage_count = max(0, (tag.usage_count or 0) - 1)
+        db.add(tag)  # Explicitly mark tag as modified
+
     block.is_deleted = True
     db.commit()
 
@@ -169,8 +200,26 @@ def delete_content_block(block_id: int, db: Session = Depends(get_db)):
 # Tags
 @router.get("/tags", response_model=List[TagResponse])
 def get_tags(db: Session = Depends(get_db)):
-    """Get all tags"""
-    tags = db.query(Tag).order_by(Tag.usage_count.desc()).all()
+    """Get all tags with calculated usage counts"""
+    from app.models.content import content_block_tags
+
+    # Get all tags with their actual usage count from the junction table
+    tags = db.query(Tag).all()
+
+    # Calculate usage count for each tag (excluding deleted blocks)
+    for tag in tags:
+        count = db.query(content_block_tags).join(
+            ContentBlock,
+            content_block_tags.c.content_block_id == ContentBlock.id
+        ).filter(
+            content_block_tags.c.tag_id == tag.id,
+            ContentBlock.is_deleted == False
+        ).count()
+        tag.usage_count = count
+
+    # Sort by usage count descending
+    tags.sort(key=lambda t: t.usage_count or 0, reverse=True)
+
     return tags
 
 

@@ -149,9 +149,6 @@ export function TagPicker({ selectedTagIds, onChange }: TagPickerProps) {
               style={{ backgroundColor: tag.color || '#6B7280' }}
             />
             <span className="text-sm">{tag.name}</span>
-            <span className="ml-auto text-xs text-gray-500">
-              {tag.usage_count || 0}
-            </span>
           </button>
         ))}
 
