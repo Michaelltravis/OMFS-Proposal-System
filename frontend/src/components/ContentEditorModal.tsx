@@ -2,10 +2,11 @@
  * Content Editor Modal - Create and edit content blocks with Claude AI assistance
  */
 import { useState } from 'react';
-import { X, Sparkles, Loader2, Save } from 'lucide-react';
+import { X, Sparkles, Loader2, Save, History } from 'lucide-react';
 import { RichTextEditor } from './common/RichTextEditor';
+import { VersionHistory } from './VersionHistory';
 import { contentService } from '../services/contentService';
-import type { ContentBlock } from '../types';
+import type { ContentBlock, ContentVersion } from '../types';
 
 interface ContentEditorModalProps {
   block?: ContentBlock | null;
@@ -21,6 +22,7 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showClaudePanel, setShowClaudePanel] = useState(false);
+  const [activeTab, setActiveTab] = useState<'edit' | 'versions'>('edit');
 
   const sectionTypes = [
     { value: 'technical_approach', label: 'Technical Approach' },
@@ -92,27 +94,75 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
     }
   };
 
+  const handleRevertToVersion = (version: ContentVersion) => {
+    setTitle(version.title);
+    setContent(version.content);
+    setActiveTab('edit');
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">
-            {block ? 'Edit Content Block' : 'Create New Content Block'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-6 h-6" />
-          </button>
+        <div className="border-b border-gray-200">
+          <div className="flex items-center justify-between p-6">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {block ? 'Edit Content Block' : 'Create New Content Block'}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Tabs - Only show for existing blocks */}
+          {block && (
+            <div className="flex gap-1 px-6">
+              <button
+                onClick={() => setActiveTab('edit')}
+                className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+                  activeTab === 'edit'
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  Edit Content
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('versions')}
+                className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+                  activeTab === 'versions'
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <History className="w-4 h-4" />
+                  Version History
+                </div>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Modal Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main Editor - Left 2/3 */}
-            <div className="lg:col-span-2 space-y-4">
+          {activeTab === 'versions' && block ? (
+            <VersionHistory
+              blockId={block.id}
+              currentTitle={title}
+              currentContent={content}
+              onRevert={handleRevertToVersion}
+            />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Main Editor - Left 2/3 */}
+              <div className="lg:col-span-2 space-y-4">
               {/* Title */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -253,6 +303,7 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
               </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* Modal Footer */}

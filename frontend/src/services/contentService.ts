@@ -60,6 +60,10 @@ export const contentService = {
     return apiClient.get<ContentVersion[]>(`/api/content/blocks/${blockId}/versions`);
   },
 
+  createVersion: async (blockId: number, data: { change_description?: string; created_by?: string }) => {
+    return apiClient.post<ContentVersion>(`/api/content/blocks/${blockId}/versions`, data);
+  },
+
   revertToVersion: async (blockId: number, versionId: number) => {
     return apiClient.post<ContentBlock>(`/api/content/blocks/${blockId}/versions/${versionId}/revert`);
   },
