@@ -18,10 +18,10 @@ export const RepositoryPage = () => {
 
   // Fetch content blocks
   const { data, isLoading } = useQuery({
-    queryKey: ['content-blocks', { search: searchQuery, section_type: selectedSectionType }],
+    queryKey: ['content-blocks', { query: searchQuery, section_type: selectedSectionType }],
     queryFn: () =>
       contentService.getContentBlocks({
-        search: searchQuery || undefined,
+        query: searchQuery || undefined,
         section_type: selectedSectionType || undefined,
       }),
   });

@@ -20,7 +20,7 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
   const [claudePrompt, setClaudePrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [showClaudePanel, setShowClaudePanel] = useState(false);
+  const [_showClaudePanel, _setShowClaudePanel] = useState(false);
 
   const sectionTypes = [
     { value: 'technical_approach', label: 'Technical Approach' },

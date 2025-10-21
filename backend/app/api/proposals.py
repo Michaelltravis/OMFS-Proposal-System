@@ -19,6 +19,7 @@ from app.schemas.proposal import (
     ProposalSectionCreate,
     ProposalSectionUpdate,
     ProposalSectionResponse,
+    SectionReorderRequest,
     ProposalContentCreate,
     ProposalContentUpdate,
     ProposalContentResponse,
@@ -228,6 +229,40 @@ def delete_section(proposal_id: int, section_id: int, db: Session = Depends(get_
     db.commit()
 
     return None
+
+
+@router.put("/{proposal_id}/sections/reorder", response_model=List[ProposalSectionResponse])
+def reorder_sections(
+    proposal_id: int,
+    reorder_data: SectionReorderRequest,
+    db: Session = Depends(get_db),
+):
+    """Reorder proposal sections"""
+    # Verify proposal exists
+    proposal = db.query(Proposal).filter(Proposal.id == proposal_id).first()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+
+    # Update order for each section
+    for item in reorder_data.sections:
+        section = db.query(ProposalSection).filter(
+            ProposalSection.id == item.id,
+            ProposalSection.proposal_id == proposal_id,
+        ).first()
+
+        if not section:
+            raise HTTPException(status_code=404, detail=f"Section {item.id} not found")
+
+        section.order = item.order
+
+    db.commit()
+
+    # Return updated sections in order
+    sections = db.query(ProposalSection).filter(
+        ProposalSection.proposal_id == proposal_id
+    ).order_by(ProposalSection.order).all()
+
+    return sections
 
 
 # Section Content

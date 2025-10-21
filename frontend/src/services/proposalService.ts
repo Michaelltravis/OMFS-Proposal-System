@@ -55,8 +55,8 @@ export const proposalService = {
     return apiClient.delete(`/api/proposals/${proposalId}/sections/${sectionId}`);
   },
 
-  reorderSections: async (proposalId: number, sectionIds: number[]) => {
-    return apiClient.post(`/api/proposals/${proposalId}/sections/reorder`, { section_ids: sectionIds });
+  reorderSections: async (proposalId: number, sections: Array<{ id: number; order: number }>) => {
+    return apiClient.put<ProposalSection[]>(`/api/proposals/${proposalId}/sections/reorder`, { sections });
   },
 
   // Section Content

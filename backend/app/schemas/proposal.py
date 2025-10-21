@@ -73,6 +73,15 @@ class ProposalSectionUpdate(BaseModel):
     requirements: Optional[Dict[str, Any]] = None
 
 
+class SectionReorderItem(BaseModel):
+    id: int
+    order: int
+
+
+class SectionReorderRequest(BaseModel):
+    sections: List[SectionReorderItem]
+
+
 class ProposalSectionResponse(ProposalSectionBase):
     id: int
     proposal_id: int

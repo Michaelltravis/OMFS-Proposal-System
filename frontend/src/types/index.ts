@@ -68,25 +68,11 @@ export interface Tag {
 
 // Proposal Builder Types
 
-export enum ProposalStatus {
-  DRAFT = 'draft',
-  IN_PROGRESS = 'in_progress',
-  REVIEW = 'review',
-  COMPLETED = 'completed',
-  ARCHIVED = 'archived',
-}
+export type ProposalStatus = 'draft' | 'in_progress' | 'review' | 'completed' | 'archived';
 
-export enum SectionStatus {
-  NOT_STARTED = 'not_started',
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
-}
+export type SectionStatus = 'not_started' | 'in_progress' | 'completed' | 'pending';
 
-export enum RequirementStatus {
-  NOT_ADDRESSED = 'not_addressed',
-  PARTIALLY_ADDRESSED = 'partially_addressed',
-  FULLY_ADDRESSED = 'fully_addressed',
-}
+export type RequirementStatus = 'not_addressed' | 'partially_addressed' | 'fully_addressed';
 
 export interface Proposal {
   id: number;
