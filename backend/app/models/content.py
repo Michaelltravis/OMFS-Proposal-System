@@ -26,6 +26,14 @@ content_block_tags = Table(
     Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE")),
 )
 
+# Many-to-many relationship table for content blocks and section types
+content_block_section_types = Table(
+    "content_block_section_types",
+    Base.metadata,
+    Column("content_block_id", Integer, ForeignKey("content_blocks.id", ondelete="CASCADE")),
+    Column("section_type_id", Integer, ForeignKey("section_types.id", ondelete="CASCADE")),
+)
+
 
 class ContentBlock(Base):
     """
@@ -77,6 +85,7 @@ class ContentBlock(Base):
     # Relationships
     parent = relationship("ContentBlock", remote_side=[id], backref="children")
     tags = relationship("Tag", secondary=content_block_tags, back_populates="content_blocks")
+    section_types = relationship("SectionType", secondary=content_block_section_types, back_populates="content_blocks")
     chunks = relationship("ContentChunk", back_populates="content_block", cascade="all, delete-orphan")
     versions = relationship("ContentVersion", back_populates="content_block", cascade="all, delete-orphan")
 
@@ -148,3 +157,24 @@ class Tag(Base):
 
     # Relationships
     content_blocks = relationship("ContentBlock", secondary=content_block_tags, back_populates="tags")
+
+
+class SectionType(Base):
+    """
+    Section types for categorizing content blocks
+    Users can manually label content blocks with section types
+    """
+
+    __tablename__ = "section_types"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False, index=True)
+    display_name = Column(String(100), nullable=False)  # Human-readable name
+    description = Column(Text, nullable=True)  # Description of when to use this section type
+    color = Column(String(20), nullable=True)  # For UI display
+    usage_count = Column(Integer, default=0)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    content_blocks = relationship("ContentBlock", secondary=content_block_section_types, back_populates="section_types")

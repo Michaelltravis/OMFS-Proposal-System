@@ -5,6 +5,7 @@ import { apiClient } from './api';
 import type {
   ContentBlock,
   Tag,
+  SectionType,
   SearchParams,
   PaginatedResponse,
   ContentVersion,
@@ -53,6 +54,15 @@ export const contentService = {
 
   createTag: async (data: Partial<Tag>) => {
     return apiClient.post<Tag>('/api/content/tags', data);
+  },
+
+  // Section Types
+  getSectionTypes: async () => {
+    return apiClient.get<SectionType[]>('/api/content/section-types');
+  },
+
+  createSectionType: async (data: Partial<SectionType>) => {
+    return apiClient.post<SectionType>('/api/content/section-types', data);
   },
 
   // Versions

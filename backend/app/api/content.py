@@ -5,13 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
-from app.models.content import ContentBlock, Tag, ContentVersion
+from app.models.content import ContentBlock, Tag, SectionType, ContentVersion
 from app.schemas.content import (
     ContentBlockCreate,
     ContentBlockUpdate,
     ContentBlockResponse,
     TagCreate,
     TagResponse,
+    SectionTypeCreate,
+    SectionTypeResponse,
     ContentVersionResponse,
     SearchParams,
     AIGenerateRequest,
@@ -86,9 +88,10 @@ def create_content_block(
     db: Session = Depends(get_db),
 ):
     """Create a new content block"""
-    # Extract tag IDs
+    # Extract tag IDs and section type IDs
     tag_ids = block_data.tag_ids if hasattr(block_data, 'tag_ids') else []
-    block_dict = block_data.model_dump(exclude={'tag_ids'})
+    section_type_ids = block_data.section_type_ids if hasattr(block_data, 'section_type_ids') else []
+    block_dict = block_data.model_dump(exclude={'tag_ids', 'section_type_ids'})
 
     # Create content block
     content_block = ContentBlock(**block_dict)
@@ -97,6 +100,11 @@ def create_content_block(
     if tag_ids:
         tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
         content_block.tags = tags
+
+    # Add section types if provided
+    if section_type_ids:
+        section_types = db.query(SectionType).filter(SectionType.id.in_(section_type_ids)).all()
+        content_block.section_types = section_types
 
     db.add(content_block)
     db.commit()
@@ -137,7 +145,7 @@ def update_content_block(
     db.add(version)
 
     # Update fields
-    update_data = block_data.model_dump(exclude_unset=True, exclude={'tag_ids'})
+    update_data = block_data.model_dump(exclude_unset=True, exclude={'tag_ids', 'section_type_ids'})
     for field, value in update_data.items():
         setattr(block, field, value)
 
@@ -145,6 +153,11 @@ def update_content_block(
     if hasattr(block_data, 'tag_ids') and block_data.tag_ids is not None:
         tags = db.query(Tag).filter(Tag.id.in_(block_data.tag_ids)).all()
         block.tags = tags
+
+    # Update section types if provided
+    if hasattr(block_data, 'section_type_ids') and block_data.section_type_ids is not None:
+        section_types = db.query(SectionType).filter(SectionType.id.in_(block_data.section_type_ids)).all()
+        block.section_types = section_types
 
     db.commit()
     db.refresh(block)
@@ -188,6 +201,30 @@ def create_tag(tag_data: TagCreate, db: Session = Depends(get_db)):
     db.refresh(tag)
 
     return tag
+
+
+# Section Types
+@router.get("/section-types", response_model=List[SectionTypeResponse])
+def get_section_types(db: Session = Depends(get_db)):
+    """Get all section types"""
+    section_types = db.query(SectionType).order_by(SectionType.usage_count.desc()).all()
+    return section_types
+
+
+@router.post("/section-types", response_model=SectionTypeResponse, status_code=201)
+def create_section_type(section_type_data: SectionTypeCreate, db: Session = Depends(get_db)):
+    """Create a new section type"""
+    # Check if section type already exists
+    existing = db.query(SectionType).filter(SectionType.name == section_type_data.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Section type already exists")
+
+    section_type = SectionType(**section_type_data.model_dump())
+    db.add(section_type)
+    db.commit()
+    db.refresh(section_type)
+
+    return section_type
 
 
 # Versions

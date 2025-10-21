@@ -26,6 +26,27 @@ class TagResponse(TagBase):
         from_attributes = True
 
 
+# Section Type Schemas
+class SectionTypeBase(BaseModel):
+    name: str
+    display_name: str
+    description: Optional[str] = None
+    color: Optional[str] = None
+
+
+class SectionTypeCreate(SectionTypeBase):
+    pass
+
+
+class SectionTypeResponse(SectionTypeBase):
+    id: int
+    usage_count: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # Content Block Schemas
 class ContentBlockBase(BaseModel):
     title: str
@@ -41,6 +62,7 @@ class ContentBlockBase(BaseModel):
 
 class ContentBlockCreate(ContentBlockBase):
     tag_ids: Optional[List[int]] = []
+    section_type_ids: Optional[List[int]] = []
 
 
 class ContentBlockUpdate(BaseModel):
@@ -52,6 +74,7 @@ class ContentBlockUpdate(BaseModel):
     context_metadata: Optional[Dict[str, Any]] = None
     quality_rating: Optional[float] = Field(None, ge=0, le=5)
     tag_ids: Optional[List[int]] = None
+    section_type_ids: Optional[List[int]] = None
 
 
 class CustomizationHistoryEntry(BaseModel):
@@ -72,6 +95,7 @@ class ContentBlockResponse(ContentBlockBase):
     updated_by: Optional[str] = None
     is_deleted: bool
     tags: List[TagResponse] = []
+    section_types: List[SectionTypeResponse] = []
 
     class Config:
         from_attributes = True
