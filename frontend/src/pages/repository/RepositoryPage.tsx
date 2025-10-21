@@ -395,6 +395,17 @@ const ContentBlockCard = ({ block, onClick }: { block: ContentBlock; onClick: ()
             <div className="flex items-center gap-1">
               <span className="text-sm text-gray-600">Used: {block.usage_count || 0}</span>
             </div>
+            {/* Section Type Labels */}
+            {block.section_types && block.section_types.map((st) => (
+              <span
+                key={st.id}
+                className="px-2 py-1 text-white text-xs rounded-full font-medium"
+                style={{ backgroundColor: st.color }}
+                title={st.description}
+              >
+                {st.display_name}
+              </span>
+            ))}
             {/* Tags */}
             {block.tags && block.tags.map((tag) => (
               <span
@@ -547,6 +558,16 @@ const ContentDetailModal = ({
                 </div>
               )}
               <span className="text-sm text-gray-600">Used: {block.usage_count || 0}</span>
+              {block.section_types && block.section_types.map((st) => (
+                <span
+                  key={st.id}
+                  className="px-2 py-1 text-white text-xs rounded-full font-medium"
+                  style={{ backgroundColor: st.color }}
+                  title={st.description}
+                >
+                  {st.display_name}
+                </span>
+              ))}
               {block.tags && block.tags.map((tag) => (
                 <span
                   key={tag.id}
