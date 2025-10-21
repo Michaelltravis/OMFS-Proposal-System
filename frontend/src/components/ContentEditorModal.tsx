@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { X, Sparkles, Loader2, Save } from 'lucide-react';
 import { RichTextEditor } from './common/RichTextEditor';
+import { TagPicker } from './TagPicker';
 import { contentService } from '../services/contentService';
 import type { ContentBlock } from '../types';
 
@@ -17,10 +18,12 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
   const [title, setTitle] = useState(block?.title || '');
   const [sectionType, setSectionType] = useState(block?.section_type || 'technical_approach');
   const [content, setContent] = useState(block?.content || '');
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>(
+    block?.tags?.map((tag) => tag.id) || []
+  );
   const [claudePrompt, setClaudePrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [showClaudePanel, setShowClaudePanel] = useState(false);
 
   const sectionTypes = [
     { value: 'technical_approach', label: 'Technical Approach' },
@@ -39,6 +42,7 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
         section_type: sectionType,
         content,
         quality_rating: block?.quality_rating || 3.0,
+        tag_ids: selectedTagIds,
       };
 
       if (block?.id) {
@@ -144,6 +148,9 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
                   ))}
                 </select>
               </div>
+
+              {/* Tags */}
+              <TagPicker selectedTagIds={selectedTagIds} onChange={setSelectedTagIds} />
 
               {/* Content Editor */}
               <div>

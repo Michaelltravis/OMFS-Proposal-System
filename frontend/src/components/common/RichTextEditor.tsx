@@ -174,7 +174,7 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
 export const RichTextEditor = ({
   content,
   onChange,
-  placeholder = 'Start typing...',
+  placeholder: _placeholder = 'Start typing...',
   editable = true,
 }: RichTextEditorProps) => {
   const editor = useEditor({
