@@ -152,10 +152,24 @@ export const proposalService = {
   },
 
   // Export
-  exportProposal: async (proposalId: number) => {
-    return apiClient.get<Blob>(`/api/proposals/${proposalId}/export`, {
-      responseType: 'blob',
-    });
+  exportProposal: async (proposalId: number, formattingInstructions?: string) => {
+    return apiClient.post<Blob>(
+      `/api/proposals/${proposalId}/export`,
+      { formatting_instructions: formattingInstructions },
+      {
+        responseType: 'blob',
+      }
+    );
+  },
+
+  exportSection: async (proposalId: number, sectionId: number, formattingInstructions?: string) => {
+    return apiClient.post<Blob>(
+      `/api/proposals/${proposalId}/sections/${sectionId}/export`,
+      { formatting_instructions: formattingInstructions },
+      {
+        responseType: 'blob',
+      }
+    );
   },
 
   // RFP Processing
