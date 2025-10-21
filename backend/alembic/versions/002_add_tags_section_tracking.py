@@ -1,7 +1,7 @@
 """Add section_type and tags_snapshot to content_versions
 
-Revision ID: 001
-Revises:
+Revision ID: 002
+Revises: 001
 Create Date: 2025-10-21
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '001'
-down_revision = None
+revision = '002'
+down_revision = '001'
 branch_labels = None
 depends_on = None
 

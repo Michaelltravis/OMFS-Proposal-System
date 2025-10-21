@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Plus } from 'lucide-react';
 import { contentService } from '../services/contentService';
 import type { Tag } from '../types';
@@ -10,10 +10,11 @@ interface TagPickerProps {
 
 export function TagPicker({ selectedTagIds, onChange }: TagPickerProps) {
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
-  const [isCreating, setIsCreating] = useState(false);
-  const [newTagName, setNewTagName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadTags();
@@ -31,30 +32,33 @@ export function TagPicker({ selectedTagIds, onChange }: TagPickerProps) {
     }
   };
 
-  const handleCreateTag = async () => {
-    if (!newTagName.trim()) return;
+  const handleCreateTag = async (tagName: string) => {
+    if (!tagName.trim()) return;
 
     try {
       const newTag = await contentService.createTag({
-        name: newTagName.trim(),
+        name: tagName.trim(),
         color: getRandomColor(),
       });
       setAvailableTags([...availableTags, newTag]);
       onChange([...selectedTagIds, newTag.id]);
-      setNewTagName('');
-      setIsCreating(false);
+      setSearchQuery('');
+      setShowSuggestions(false);
+      inputRef.current?.focus();
     } catch (error) {
       console.error('Failed to create tag:', error);
       alert('Failed to create tag. It may already exist.');
     }
   };
 
-  const toggleTag = (tagId: number) => {
-    if (selectedTagIds.includes(tagId)) {
-      onChange(selectedTagIds.filter((id) => id !== tagId));
-    } else {
+  const addTag = (tagId: number) => {
+    if (!selectedTagIds.includes(tagId)) {
       onChange([...selectedTagIds, tagId]);
     }
+    setSearchQuery('');
+    setShowSuggestions(false);
+    setSelectedSuggestionIndex(0);
+    inputRef.current?.focus();
   };
 
   const removeTag = (tagId: number) => {
@@ -78,11 +82,74 @@ export function TagPicker({ selectedTagIds, onChange }: TagPickerProps) {
     selectedTagIds.includes(tag.id)
   );
 
+  // Filter available tags that match search query and aren't already selected
   const filteredTags = availableTags.filter(
     (tag) =>
       !selectedTagIds.includes(tag.id) &&
       tag.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Check if there's an exact match
+  const exactMatch = filteredTags.find(
+    (tag) => tag.name.toLowerCase() === searchQuery.toLowerCase()
+  );
+
+  const handleInputChange = (value: string) => {
+    setSearchQuery(value);
+    setShowSuggestions(value.trim().length > 0);
+    setSelectedSuggestionIndex(0);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || filteredTags.length === 0) {
+      // No suggestions shown or no matches
+      if (e.key === 'Enter' && searchQuery.trim()) {
+        e.preventDefault();
+        // Create new tag
+        handleCreateTag(searchQuery);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'Tab':
+        e.preventDefault();
+        // Autocomplete with the first suggestion
+        if (filteredTags.length > 0) {
+          setSearchQuery(filteredTags[selectedSuggestionIndex].name);
+        }
+        break;
+
+      case 'Enter':
+        e.preventDefault();
+        if (filteredTags.length > 0) {
+          // Add the selected suggestion
+          addTag(filteredTags[selectedSuggestionIndex].id);
+        } else if (searchQuery.trim()) {
+          // Create new tag
+          handleCreateTag(searchQuery);
+        }
+        break;
+
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) =>
+          prev < filteredTags.length - 1 ? prev + 1 : prev
+        );
+        break;
+
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) => (prev > 0 ? prev - 1 : 0));
+        break;
+
+      case 'Escape':
+        e.preventDefault();
+        setShowSuggestions(false);
+        setSearchQuery('');
+        break;
+    }
+  };
 
   if (loading) {
     return (
@@ -119,88 +186,62 @@ export function TagPicker({ selectedTagIds, onChange }: TagPickerProps) {
         </div>
       )}
 
-      {/* Search Input */}
+      {/* Autocomplete Input */}
       <div className="relative">
         <input
+          ref={inputRef}
           type="text"
-          placeholder="Search tags..."
+          placeholder="Type to search or create tags... (Tab to autocomplete, Enter to add)"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          onChange={(e) => handleInputChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => searchQuery && setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
         />
-      </div>
 
-      {/* Available Tags */}
-      <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
-        {filteredTags.length === 0 && !isCreating && (
-          <div className="text-sm text-gray-500 text-center py-2">
-            {searchQuery ? 'No tags found' : 'All tags selected'}
+        {/* Autocomplete Suggestions Dropdown */}
+        {showSuggestions && searchQuery && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+            {filteredTags.length > 0 ? (
+              <>
+                {filteredTags.map((tag, index) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => addTag(tag.id)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
+                      index === selectedSuggestionIndex
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: tag.color || '#6B7280' }}
+                    />
+                    <span className="text-sm">{tag.name}</span>
+                  </button>
+                ))}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleCreateTag(searchQuery)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 text-left transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="text-sm font-medium">Create "{searchQuery}"</span>
+              </button>
+            )}
           </div>
         )}
-        {filteredTags.map((tag) => (
-          <button
-            key={tag.id}
-            type="button"
-            onClick={() => toggleTag(tag.id)}
-            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-100 rounded-lg text-left transition-colors"
-          >
-            <div
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: tag.color || '#6B7280' }}
-            />
-            <span className="text-sm">{tag.name}</span>
-          </button>
-        ))}
-
-        {/* Create New Tag */}
-        {isCreating ? (
-          <div className="flex gap-2 p-2 bg-blue-50 rounded-lg">
-            <input
-              type="text"
-              placeholder="New tag name..."
-              value={newTagName}
-              onChange={(e) => setNewTagName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleCreateTag();
-                } else if (e.key === 'Escape') {
-                  setIsCreating(false);
-                  setNewTagName('');
-                }
-              }}
-              autoFocus
-              className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <button
-              type="button"
-              onClick={handleCreateTag}
-              className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-            >
-              Add
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsCreating(false);
-                setNewTagName('');
-              }}
-              className="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setIsCreating(true)}
-            className="w-full flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg text-left transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="text-sm font-medium">Create new tag</span>
-          </button>
-        )}
       </div>
+
+      {/* Helper Text */}
+      <p className="text-xs text-gray-500">
+        Press Tab to autocomplete, Enter to add tag
+      </p>
     </div>
   );
 }

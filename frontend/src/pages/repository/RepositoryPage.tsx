@@ -7,6 +7,7 @@ import { Search, Plus, Filter, X, History, RotateCcw, Eye, EyeOff } from 'lucide
 import { contentService } from '../../services/contentService';
 import type { ContentBlock, ContentVersion } from '../../types';
 import { ContentEditorModal } from '../../components/ContentEditorModal';
+import { AdvancedFilterModal } from '../../components/AdvancedFilterModal';
 import * as DiffMatchPatch from 'diff-match-patch';
 
 export const RepositoryPage = () => {
@@ -14,11 +15,11 @@ export const RepositoryPage = () => {
   const [selectedTab, setSelectedTab] = useState('all');
 
   // Pending filters (not yet applied)
-  const [pendingSectionType, setPendingSectionType] = useState<string | null>(null);
+  const [pendingSectionTypeId, setPendingSectionTypeId] = useState<number | null>(null);
   const [pendingTags, setPendingTags] = useState<string[]>([]);
 
   // Applied filters (used in API query)
-  const [appliedSectionType, setAppliedSectionType] = useState<string | null>(null);
+  const [appliedSectionTypeId, setAppliedSectionTypeId] = useState<number | null>(null);
   const [appliedTags, setAppliedTags] = useState<string[]>([]);
 
   const [tagSearchQuery, setTagSearchQuery] = useState('');
@@ -26,6 +27,7 @@ export const RepositoryPage = () => {
   const [selectedBlock, setSelectedBlock] = useState<ContentBlock | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
+  const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -40,27 +42,39 @@ export const RepositoryPage = () => {
 
   // Fetch content blocks with applied filters
   const { data, isLoading } = useQuery({
-    queryKey: ['content-blocks', { query: searchQuery, section_type: appliedSectionType, tags: appliedTags }],
+    queryKey: ['content-blocks', { query: searchQuery, section_type_id: appliedSectionTypeId, tags: appliedTags }],
     queryFn: () =>
       contentService.getContentBlocks({
         query: searchQuery || undefined,
-        section_type: appliedSectionType || undefined,
+        section_type_id: appliedSectionTypeId || undefined,
         tags: appliedTags.length > 0 ? appliedTags : undefined,
       }),
   });
 
   // Apply filters handler
   const applyFilters = () => {
-    setAppliedSectionType(pendingSectionType);
+    setAppliedSectionTypeId(pendingSectionTypeId);
     setAppliedTags(pendingTags);
   };
 
   // Clear all filters
   const clearAllFilters = () => {
-    setPendingSectionType(null);
+    setPendingSectionTypeId(null);
     setPendingTags([]);
-    setAppliedSectionType(null);
+    setAppliedSectionTypeId(null);
     setAppliedTags([]);
+  };
+
+  // Handle advanced filter modal apply
+  const handleAdvancedFilterApply = (sectionTypeIds: number[], tagNames: string[]) => {
+    // For now, we only support single section type filter in the main query
+    // If multiple section types are selected, we'll use the first one
+    // This could be enhanced later to support multiple section types
+    setPendingSectionTypeId(sectionTypeIds.length > 0 ? sectionTypeIds[0] : null);
+    setAppliedSectionTypeId(sectionTypeIds.length > 0 ? sectionTypeIds[0] : null);
+
+    setPendingTags(tagNames);
+    setAppliedTags(tagNames);
   };
 
   // Fetch available tags
@@ -69,19 +83,14 @@ export const RepositoryPage = () => {
     queryFn: () => contentService.getTags(),
   });
 
+  // Fetch available section types
+  const { data: availableSectionTypes } = useQuery({
+    queryKey: ['section-types'],
+    queryFn: () => contentService.getSectionTypes(),
+  });
+
   const tabs = [
     { id: 'all', label: 'All Content', count: data?.total || 0 },
-    { id: 'technical', label: 'Technical Approach', count: 0 },
-    { id: 'performance', label: 'Past Performance', count: 0 },
-    { id: 'qualifications', label: 'Qualifications', count: 0 },
-  ];
-
-  const sectionTypes = [
-    'technical_approach',
-    'past_performance',
-    'executive_summary',
-    'qualifications',
-    'pricing',
   ];
 
   return (
@@ -94,14 +103,17 @@ export const RepositoryPage = () => {
               <Filter className="w-4 h-4" />
               Filters
             </h2>
-            <button className="text-sm text-primary-600 hover:text-primary-700">
+            <button
+              onClick={() => setIsAdvancedFilterOpen(true)}
+              className="text-sm text-primary-600 hover:text-primary-700"
+            >
               View All
             </button>
           </div>
 
           {/* Section Type Filter */}
           <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Section Type</h3>
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Section Type Labels</h3>
             {/* Section Type Search Input */}
             <div className="mb-2">
               <input
@@ -114,36 +126,45 @@ export const RepositoryPage = () => {
             </div>
             <div className="space-y-1">
               <button
-                onClick={() => setPendingSectionType(null)}
+                onClick={() => setPendingSectionTypeId(null)}
                 className={`w-full text-left px-3 py-2 rounded text-sm ${
-                  pendingSectionType === null
+                  pendingSectionTypeId === null
                     ? 'bg-primary-50 text-primary-700'
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 All Types
               </button>
-              {sectionTypes
+              {availableSectionTypes && availableSectionTypes
                 .filter((type) =>
-                  type.toLowerCase().replace('_', ' ').includes(sectionTypeSearchQuery.toLowerCase())
+                  type.display_name.toLowerCase().includes(sectionTypeSearchQuery.toLowerCase()) ||
+                  type.name.toLowerCase().includes(sectionTypeSearchQuery.toLowerCase())
                 )
                 .map((type) => (
                   <button
-                    key={type}
-                    onClick={() => setPendingSectionType(type)}
-                    className={`w-full text-left px-3 py-2 rounded text-sm capitalize ${
-                      pendingSectionType === type
+                    key={type.id}
+                    onClick={() => setPendingSectionTypeId(type.id)}
+                    className={`w-full text-left px-3 py-2 rounded text-sm flex items-center gap-2 ${
+                      pendingSectionTypeId === type.id
                         ? 'bg-primary-50 text-primary-700'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    {type.replace('_', ' ')}
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: type.color || '#6B7280' }}
+                    />
+                    {type.display_name}
                   </button>
                 ))}
-              {sectionTypes.filter((type) =>
-                type.toLowerCase().replace('_', ' ').includes(sectionTypeSearchQuery.toLowerCase())
+              {availableSectionTypes && availableSectionTypes.filter((type) =>
+                type.display_name.toLowerCase().includes(sectionTypeSearchQuery.toLowerCase()) ||
+                type.name.toLowerCase().includes(sectionTypeSearchQuery.toLowerCase())
               ).length === 0 && sectionTypeSearchQuery && (
                 <div className="text-sm text-gray-500 px-3 py-2 text-center">No matching types</div>
+              )}
+              {!availableSectionTypes && (
+                <div className="text-sm text-gray-500 px-3 py-2">Loading...</div>
               )}
             </div>
           </div>
@@ -216,7 +237,7 @@ export const RepositoryPage = () => {
             >
               Apply Filters
             </button>
-            {(appliedSectionType !== null || appliedTags.length > 0) && (
+            {(appliedSectionTypeId !== null || appliedTags.length > 0) && (
               <button
                 onClick={clearAllFilters}
                 className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
@@ -302,13 +323,13 @@ export const RepositoryPage = () => {
               <div className="text-gray-400 mb-2">
                 <Filter className="w-12 h-12 mx-auto mb-3" />
               </div>
-              {(appliedSectionType !== null || appliedTags.length > 0 || searchQuery.trim() !== '') ? (
+              {(appliedSectionTypeId !== null || appliedTags.length > 0 || searchQuery.trim() !== '') ? (
                 <div>
                   <p className="text-gray-700 font-medium mb-1">No content blocks found</p>
                   <p className="text-gray-500 text-sm">
                     Try adjusting your filters or search criteria
                   </p>
-                  {(appliedSectionType !== null || appliedTags.length > 0) && (
+                  {(appliedSectionTypeId !== null || appliedTags.length > 0) && (
                     <button
                       onClick={clearAllFilters}
                       className="mt-4 px-4 py-2 text-sm text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg"
@@ -352,6 +373,16 @@ export const RepositoryPage = () => {
             setEditingBlock(null);
           }}
           onSave={handleContentSaved}
+        />
+      )}
+
+      {/* Advanced Filter Modal */}
+      {isAdvancedFilterOpen && (
+        <AdvancedFilterModal
+          onClose={() => setIsAdvancedFilterOpen(false)}
+          onApply={handleAdvancedFilterApply}
+          initialSectionTypeIds={appliedSectionTypeId !== null ? [appliedSectionTypeId] : []}
+          initialTagNames={appliedTags}
         />
       )}
     </div>

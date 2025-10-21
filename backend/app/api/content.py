@@ -32,16 +32,26 @@ def get_content_blocks(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     section_type: Optional[str] = None,
+    section_type_id: Optional[int] = None,
     query: Optional[str] = None,
     tags: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     """Get all content blocks with pagination and filtering"""
+    from app.models.content import content_block_section_types
+
     db_query = db.query(ContentBlock).filter(ContentBlock.is_deleted == False)
 
     # Apply filters
     if section_type:
         db_query = db_query.filter(ContentBlock.section_type == section_type)
+
+    # Filter by section type label (many-to-many relationship)
+    if section_type_id:
+        db_query = db_query.join(
+            content_block_section_types,
+            ContentBlock.id == content_block_section_types.c.content_block_id
+        ).filter(content_block_section_types.c.section_type_id == section_type_id)
 
     if query:
         db_query = db_query.filter(
@@ -53,14 +63,29 @@ def get_content_blocks(
 
     # Filter by tags (OR logic - blocks with any of the specified tags)
     if tags and len(tags) > 0:
-        db_query = db_query.join(ContentBlock.tags).filter(Tag.name.in_(tags))
+        from app.models.content import content_block_tags
+        # Use explicit join on the junction table if not already joined
+        if not section_type_id:
+            db_query = db_query.join(
+                content_block_tags,
+                ContentBlock.id == content_block_tags.c.content_block_id
+            ).join(Tag, content_block_tags.c.tag_id == Tag.id).filter(Tag.name.in_(tags))
+        else:
+            # Already have a join, use exists subquery instead
+            db_query = db_query.filter(
+                ContentBlock.id.in_(
+                    db.query(content_block_tags.c.content_block_id)
+                    .join(Tag, content_block_tags.c.tag_id == Tag.id)
+                    .filter(Tag.name.in_(tags))
+                )
+            )
 
     # Get total count
-    total = db_query.count()
+    total = db_query.distinct().count()
 
     # Apply pagination
     offset = (page - 1) * limit
-    items = db_query.order_by(ContentBlock.updated_at.desc()).offset(offset).limit(limit).all()
+    items = db_query.distinct().order_by(ContentBlock.updated_at.desc()).offset(offset).limit(limit).all()
 
     pages = math.ceil(total / limit)
 

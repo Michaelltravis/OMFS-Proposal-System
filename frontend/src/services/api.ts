@@ -16,6 +16,9 @@ class ApiClient {
         'Content-Type': 'application/json',
       },
       timeout: 30000, // 30 seconds
+      paramsSerializer: {
+        indexes: null, // Use tags=value1&tags=value2 instead of tags[0]=value1
+      },
     });
 
     // Request interceptor for adding auth tokens, etc.
