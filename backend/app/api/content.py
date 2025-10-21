@@ -31,6 +31,7 @@ def get_content_blocks(
     limit: int = Query(20, ge=1, le=100),
     section_type: Optional[str] = None,
     search: Optional[str] = None,
+    tag_ids: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """Get all content blocks with pagination and filtering"""
@@ -47,6 +48,11 @@ def get_content_blocks(
                 ContentBlock.content.ilike(f"%{search}%"),
             )
         )
+
+    # Filter by tags
+    if tag_ids:
+        tag_id_list = [int(tid) for tid in tag_ids.split(',')]
+        query = query.join(ContentBlock.tags).filter(Tag.id.in_(tag_id_list)).distinct()
 
     # Get total count
     total = query.count()

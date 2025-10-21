@@ -187,6 +187,7 @@ export interface SearchParams {
   query?: string;
   section_type?: string;
   tags?: string[];
+  tag_ids?: string;
   client_type?: string;
   facility_type?: string;
   min_rating?: number;
@@ -194,6 +195,7 @@ export interface SearchParams {
   date_to?: string;
   page?: number;
   limit?: number;
+  search?: string;
 }
 
 export interface SearchResult {

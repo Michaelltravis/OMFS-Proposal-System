@@ -12,17 +12,25 @@ export const RepositoryPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTab, setSelectedTab] = useState('all');
   const [selectedSectionType, setSelectedSectionType] = useState<string | null>(null);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [selectedBlock, setSelectedBlock] = useState<ContentBlock | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
 
+  // Fetch all tags
+  const { data: tagsData } = useQuery({
+    queryKey: ['tags'],
+    queryFn: () => contentService.getTags(),
+  });
+
   // Fetch content blocks
   const { data, isLoading } = useQuery({
-    queryKey: ['content-blocks', { search: searchQuery, section_type: selectedSectionType }],
+    queryKey: ['content-blocks', { search: searchQuery, section_type: selectedSectionType, tag_ids: selectedTagIds }],
     queryFn: () =>
       contentService.getContentBlocks({
         search: searchQuery || undefined,
         section_type: selectedSectionType || undefined,
+        tag_ids: selectedTagIds.length > 0 ? selectedTagIds.join(',') : undefined,
       }),
   });
 
@@ -88,9 +96,48 @@ export const RepositoryPage = () => {
 
           {/* Tags Filter */}
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Tags</h3>
-            <div className="space-y-1">
-              <div className="text-sm text-gray-500">No tags selected</div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-700">Tags</h3>
+              {selectedTagIds.length > 0 && (
+                <button
+                  onClick={() => setSelectedTagIds([])}
+                  className="text-xs text-primary-600 hover:text-primary-700"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="space-y-2">
+              {tagsData && tagsData.length > 0 ? (
+                tagsData.map((tag) => (
+                  <label
+                    key={tag.id}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedTagIds.includes(tag.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedTagIds([...selectedTagIds, tag.id]);
+                        } else {
+                          setSelectedTagIds(selectedTagIds.filter((id) => id !== tag.id));
+                        }
+                      }}
+                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                    />
+                    <span
+                      className="text-xs px-2 py-1 rounded flex-1"
+                      style={{ backgroundColor: tag.color ? tag.color + '20' : '#e5e7eb', color: tag.color || '#374151' }}
+                    >
+                      {tag.name}
+                    </span>
+                    <span className="text-xs text-gray-500">({tag.usage_count})</span>
+                  </label>
+                ))
+              ) : (
+                <div className="text-sm text-gray-500">No tags available</div>
+              )}
             </div>
           </div>
         </div>
