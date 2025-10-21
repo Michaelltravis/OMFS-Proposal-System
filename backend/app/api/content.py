@@ -12,6 +12,7 @@ from app.schemas.content import (
     ContentBlockResponse,
     TagCreate,
     TagResponse,
+    ContentVersionCreate,
     ContentVersionResponse,
     SearchParams,
     AIGenerateRequest,
@@ -121,18 +122,22 @@ def update_content_block(
         raise HTTPException(status_code=404, detail="Content block not found")
 
     # Create version snapshot before updating
+    change_desc = block_data.change_description if hasattr(block_data, 'change_description') and block_data.change_description else "Auto-saved version before update"
+    created_by = block_data.updated_by if hasattr(block_data, 'updated_by') and block_data.updated_by else None
+
     version = ContentVersion(
         content_block_id=block.id,
         version_number=len(block.versions) + 1,
         title=block.title,
         content=block.content,
         context_metadata=block.context_metadata,
-        change_description="Auto-saved version before update",
+        change_description=change_desc,
+        created_by=created_by,
     )
     db.add(version)
 
-    # Update fields
-    update_data = block_data.model_dump(exclude_unset=True, exclude={'tag_ids'})
+    # Update fields (exclude version-specific fields)
+    update_data = block_data.model_dump(exclude_unset=True, exclude={'tag_ids', 'change_description'})
     for field, value in update_data.items():
         setattr(block, field, value)
 
@@ -198,6 +203,37 @@ def get_content_versions(block_id: int, db: Session = Depends(get_db)):
     ).order_by(ContentVersion.version_number.desc()).all()
 
     return versions
+
+
+@router.post("/blocks/{block_id}/versions", response_model=ContentVersionResponse, status_code=201)
+def create_manual_version(
+    block_id: int,
+    version_data: ContentVersionCreate,
+    db: Session = Depends(get_db),
+):
+    """Create a manual version/checkpoint of a content block"""
+    block = db.query(ContentBlock).filter(
+        ContentBlock.id == block_id,
+        ContentBlock.is_deleted == False
+    ).first()
+    if not block:
+        raise HTTPException(status_code=404, detail="Content block not found")
+
+    # Create version snapshot
+    version = ContentVersion(
+        content_block_id=block.id,
+        version_number=len(block.versions) + 1,
+        title=block.title,
+        content=block.content,
+        context_metadata=block.context_metadata,
+        change_description=version_data.change_description or "Manual checkpoint",
+        created_by=version_data.created_by,
+    )
+    db.add(version)
+    db.commit()
+    db.refresh(version)
+
+    return version
 
 
 @router.post("/blocks/{block_id}/versions/{version_id}/revert", response_model=ContentBlockResponse)

@@ -52,6 +52,8 @@ class ContentBlockUpdate(BaseModel):
     context_metadata: Optional[Dict[str, Any]] = None
     quality_rating: Optional[float] = Field(None, ge=0, le=5)
     tag_ids: Optional[List[int]] = None
+    change_description: Optional[str] = Field(None, description="Description of changes made")
+    updated_by: Optional[str] = Field(None, description="User who made the update")
 
 
 class CustomizationHistoryEntry(BaseModel):
@@ -78,6 +80,11 @@ class ContentBlockResponse(ContentBlockBase):
 
 
 # Content Version Schemas
+class ContentVersionCreate(BaseModel):
+    change_description: Optional[str] = Field(None, description="Description of this version/checkpoint")
+    created_by: Optional[str] = Field(None, description="User creating this version")
+
+
 class ContentVersionResponse(BaseModel):
     id: int
     content_block_id: int
