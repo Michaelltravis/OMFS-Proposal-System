@@ -1,462 +1,286 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, FileText, Calendar, Trash2, Eye } from 'lucide-react';
-import { ProposalBuilder } from '../../components/ProposalBuilder';
-import { DraggableSectionList } from '../../components/DraggableSectionList';
-import { EditSectionModal } from '../../components/EditSectionModal';
-import { SectionContentModal } from '../../components/SectionContentModal';
+/**
+ * Proposal Builder Page - Create and manage proposals
+ */
+import { useState, useEffect } from 'react';
+import { useParams } from 'react-router';
+import { Download, FileText, Loader2, MessageSquare } from 'lucide-react';
 import { proposalService } from '../../services/proposalService';
 import type { Proposal, ProposalSection } from '../../types';
 
-type ViewMode = 'list' | 'builder' | 'editor';
-
-interface ProposalFormData {
-  title: string;
-  client: string;
-  dueDate: string;
-  description?: string;
-  sections: Array<{
-    id: string;
-    title: string;
-    description?: string;
-    pageTarget?: number;
-    order: number;
-  }>;
-}
-
 export const ProposalPage = () => {
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
-  const [editingSection, setEditingSection] = useState<ProposalSection | null>(null);
-  const [isEditSectionModalOpen, setIsEditSectionModalOpen] = useState(false);
-  const [contentSection, setContentSection] = useState<ProposalSection | null>(null);
-  const [isContentModalOpen, setIsContentModalOpen] = useState(false);
-  const [isAddingSectionModal, setIsAddingSectionModal] = useState(false);
-  const queryClient = useQueryClient();
+  const { proposalId } = useParams<{ proposalId: string }>();
+  const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [sections, setSections] = useState<ProposalSection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [exportingSection, setExportingSection] = useState<number | null>(null);
+  const [showFormatModal, setShowFormatModal] = useState(false);
+  const [currentExportSection, setCurrentExportSection] = useState<number | null>(null);
+  const [formattingInstructions, setFormattingInstructions] = useState('');
 
-  // Fetch proposals
-  const { data: proposalsData, isLoading } = useQuery({
-    queryKey: ['proposals'],
-    queryFn: async () => {
-      const response = await proposalService.getProposals({ archived: false });
-      return response;
-    },
-  });
+  // Load proposal and sections
+  useEffect(() => {
+    if (proposalId) {
+      loadProposal(parseInt(proposalId));
+    }
+  }, [proposalId]);
 
-  // Fetch sections for selected proposal
-  const { data: sections, isLoading: sectionsLoading } = useQuery({
-    queryKey: ['sections', selectedProposal?.id],
-    queryFn: async () => {
-      if (!selectedProposal) return [];
-      const response = await proposalService.getSections(selectedProposal.id);
-      return response;
-    },
-    enabled: !!selectedProposal,
-  });
-
-  // Create proposal mutation
-  const createProposalMutation = useMutation({
-    mutationFn: async (formData: ProposalFormData) => {
-      // First create the proposal
-      const proposalResponse = await proposalService.createProposal({
-        name: formData.title,
-        client_name: formData.client,
-        rfp_deadline: formData.dueDate || undefined,
-        notes: formData.description,
-      });
-
-      const proposal = proposalResponse;
-
-      // Then create all sections
-      for (const section of formData.sections) {
-        await proposalService.createSection(proposal.id, {
-          title: section.title,
-          order: section.order,
-          page_target_min: section.pageTarget,
-          notes: section.description,
-        });
-      }
-
-      return proposal;
-    },
-    onSuccess: (proposal) => {
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
-      setSelectedProposal(proposal);
-      setViewMode('editor');
-    },
-  });
-
-  // Delete proposal mutation
-  const deleteProposalMutation = useMutation({
-    mutationFn: (id: number) => proposalService.deleteProposal(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
-    },
-  });
-
-  // Reorder sections mutation
-  const reorderSectionsMutation = useMutation({
-    mutationFn: async (reorderedSections: ProposalSection[]) => {
-      if (!selectedProposal) return;
-      const sections = reorderedSections.map(s => ({ id: s.id, order: s.order }));
-      return proposalService.reorderSections(selectedProposal.id, sections);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sections', selectedProposal?.id] });
-    },
-  });
-
-  // Delete section mutation
-  const deleteSectionMutation = useMutation({
-    mutationFn: (sectionId: number) => {
-      if (!selectedProposal) throw new Error('No proposal selected');
-      return proposalService.deleteSection(selectedProposal.id, sectionId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sections', selectedProposal?.id] });
-    },
-  });
-
-  // Update section mutation
-  const updateSectionMutation = useMutation({
-    mutationFn: ({ sectionId, data }: { sectionId: number; data: Partial<ProposalSection> }) => {
-      if (!selectedProposal) throw new Error('No proposal selected');
-      return proposalService.updateSection(selectedProposal.id, sectionId, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sections', selectedProposal?.id] });
-    },
-  });
-
-  // Add content to section mutation
-  const addContentMutation = useMutation({
-    mutationFn: ({ sectionId, content }: { sectionId: number; content: string }) => {
-      if (!selectedProposal) throw new Error('No proposal selected');
-      return proposalService.addContentToSection(selectedProposal.id, sectionId, {
-        content,
-        title: '',
-        order: 0,
-        is_custom: true,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sections', selectedProposal?.id] });
-    },
-  });
-
-  // Create new section mutation
-  const createSectionMutation = useMutation({
-    mutationFn: (data: Partial<ProposalSection>) => {
-      if (!selectedProposal) throw new Error('No proposal selected');
-      const maxOrder = sections?.reduce((max: number, s: ProposalSection) => Math.max(max, s.order), -1) ?? -1;
-      return proposalService.createSection(selectedProposal.id, {
-        ...data,
-        order: maxOrder + 1,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sections', selectedProposal?.id] });
-    },
-  });
-
-  const handleProposalComplete = (formData: ProposalFormData) => {
-    createProposalMutation.mutate(formData);
-  };
-
-  const handleViewProposal = (proposal: Proposal) => {
-    setSelectedProposal(proposal);
-    setViewMode('editor');
-  };
-
-  const handleBackToList = () => {
-    setSelectedProposal(null);
-    setViewMode('list');
-  };
-
-  const handleReorder = (reorderedSections: ProposalSection[]) => {
-    reorderSectionsMutation.mutate(reorderedSections);
-  };
-
-  const handleEditSection = (section: ProposalSection) => {
-    setEditingSection(section);
-    setIsEditSectionModalOpen(true);
-  };
-
-  const handleSaveSection = (data: Partial<ProposalSection>) => {
-    if (editingSection) {
-      updateSectionMutation.mutate({
-        sectionId: editingSection.id,
-        data,
-      });
+  const loadProposal = async (id: number) => {
+    try {
+      setLoading(true);
+      const [proposalData, sectionsData] = await Promise.all([
+        proposalService.getProposal(id),
+        proposalService.getSections(id),
+      ]);
+      setProposal(proposalData.data);
+      setSections(sectionsData.data);
+    } catch (error) {
+      console.error('Error loading proposal:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDeleteSection = (sectionId: number) => {
-    if (confirm('Are you sure you want to delete this section?')) {
-      deleteSectionMutation.mutate(sectionId);
-    }
+  const handleExportSection = async (sectionId: number, sectionTitle: string) => {
+    if (!proposalId) return;
+
+    // Open format modal to get Claude formatting instructions
+    setCurrentExportSection(sectionId);
+    setShowFormatModal(true);
   };
 
-  const handleAddContent = (sectionId: number) => {
-    const section = sections?.find((s: ProposalSection) => s.id === sectionId);
-    if (section) {
-      setContentSection(section);
-      setIsContentModalOpen(true);
-    }
-  };
+  const executeExport = async () => {
+    if (!proposalId || currentExportSection === null) return;
 
-  const handleSaveContent = (content: string) => {
-    if (contentSection) {
-      addContentMutation.mutate({
-        sectionId: contentSection.id,
-        content,
+    try {
+      setExportingSection(currentExportSection);
+      setShowFormatModal(false);
+
+      const response = await proposalService.exportSection(
+        parseInt(proposalId),
+        currentExportSection,
+        formattingInstructions || undefined
+      );
+
+      // Get section title for filename
+      const section = sections.find(s => s.id === currentExportSection);
+      const filename = section
+        ? `${section.title.replace(/[^a-z0-9]/gi, '_')}.docx`
+        : `section_${currentExportSection}.docx`;
+
+      // Create download link
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      // Reset state
+      setFormattingInstructions('');
+      setCurrentExportSection(null);
+    } catch (error) {
+      console.error('Error exporting section:', error);
+      alert('Failed to export section. Please try again.');
+    } finally {
+      setExportingSection(null);
     }
   };
 
-  const handleAddNewSection = () => {
-    setEditingSection({
-      id: 0,
-      proposal_id: selectedProposal?.id || 0,
-      title: '',
-      order: 0,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    } as ProposalSection);
-    setIsAddingSectionModal(true);
+  const getSectionStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
-  const handleSaveNewSection = (data: Partial<ProposalSection>) => {
-    createSectionMutation.mutate(data);
-  };
-
-  const formatDate = (date?: string | Date | null) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString();
-  };
-
-  // Builder View
-  if (viewMode === 'builder') {
+  if (loading) {
     return (
-      <div className="h-full overflow-auto bg-gray-50">
-        <ProposalBuilder
-          onComplete={handleProposalComplete}
-          onCancel={() => setViewMode('list')}
-        />
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
   }
 
-  // Editor View
-  if (viewMode === 'editor' && selectedProposal) {
+  if (!proposal) {
     return (
-      <div className="h-full overflow-auto bg-gray-50">
-        <div className="max-w-6xl mx-auto p-6">
-          {/* Header */}
-          <div className="mb-6">
-            <button
-              onClick={handleBackToList}
-              className="text-blue-600 hover:text-blue-800 mb-4 flex items-center gap-2"
-            >
-              ← Back to Proposals
-            </button>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{selectedProposal.name}</h1>
-              <div className="flex gap-6 text-sm text-gray-600">
-                {selectedProposal.client_name && (
-                  <span>Client: {selectedProposal.client_name}</span>
-                )}
-                {selectedProposal.rfp_deadline && (
-                  <span className="flex items-center gap-1">
-                    <Calendar size={14} />
-                    Due: {formatDate(selectedProposal.rfp_deadline)}
-                  </span>
-                )}
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  selectedProposal.status === 'completed' ? 'bg-green-100 text-green-800' :
-                  selectedProposal.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}>
-                  {selectedProposal.status}
-                </span>
-              </div>
-              {selectedProposal.notes && (
-                <p className="mt-3 text-gray-700">{selectedProposal.notes}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Sections */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-gray-900">Proposal Sections</h2>
-              <button
-                onClick={handleAddNewSection}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-              >
-                <Plus size={20} />
-                Add Section
-              </button>
-            </div>
-
-            {sectionsLoading ? (
-              <div className="text-center py-12">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <p className="text-gray-600 mt-2">Loading sections...</p>
-              </div>
-            ) : (
-              <DraggableSectionList
-                sections={sections || []}
-                onReorder={handleReorder}
-                onEdit={handleEditSection}
-                onDelete={handleDeleteSection}
-                onAddContent={handleAddContent}
-              />
-            )}
-          </div>
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Proposal Not Found</h2>
+          <p className="text-gray-600">The requested proposal could not be found.</p>
         </div>
-
-        {/* Modals */}
-        <EditSectionModal
-          isOpen={isEditSectionModalOpen}
-          section={editingSection}
-          onSave={handleSaveSection}
-          onClose={() => {
-            setIsEditSectionModalOpen(false);
-            setEditingSection(null);
-          }}
-        />
-
-        <EditSectionModal
-          isOpen={isAddingSectionModal}
-          section={editingSection}
-          onSave={(data) => {
-            handleSaveNewSection(data);
-            setIsAddingSectionModal(false);
-            setEditingSection(null);
-          }}
-          onClose={() => {
-            setIsAddingSectionModal(false);
-            setEditingSection(null);
-          }}
-        />
-
-        <SectionContentModal
-          isOpen={isContentModalOpen}
-          sectionTitle={contentSection?.title || ''}
-          onSave={handleSaveContent}
-          onClose={() => {
-            setIsContentModalOpen(false);
-            setContentSection(null);
-          }}
-        />
       </div>
     );
   }
 
-  // List View
   return (
-    <div className="h-full overflow-auto bg-gray-50">
+    <div className="h-full bg-gray-50 overflow-auto">
       <div className="max-w-6xl mx-auto p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Proposals</h1>
-            <p className="text-gray-600 mt-1">Manage and build your proposals</p>
-          </div>
-          <button
-            onClick={() => setViewMode('builder')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-          >
-            <Plus size={20} />
-            New Proposal
-          </button>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{proposal.name}</h1>
+          {proposal.client_name && (
+            <p className="text-lg text-gray-600">Client: {proposal.client_name}</p>
+          )}
+          {proposal.rfp_deadline && (
+            <p className="text-sm text-gray-500">
+              Deadline: {new Date(proposal.rfp_deadline).toLocaleDateString()}
+            </p>
+          )}
         </div>
 
-        {/* Proposals List */}
-        {isLoading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="text-gray-600 mt-2">Loading proposals...</p>
+        {/* Sections */}
+        {sections.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Sections Yet</h3>
+            <p className="text-gray-600">Start building your proposal by adding sections.</p>
           </div>
-        ) : proposalsData?.items && proposalsData.items.length > 0 ? (
-          <div className="grid gap-4">
-            {proposalsData.items.map((proposal: Proposal) => (
+        ) : (
+          <div className="space-y-6">
+            {sections.map((section) => (
               <div
-                key={proposal.id}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+                key={section.id}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-grow">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                      {proposal.name}
-                    </h3>
-                    <div className="flex gap-4 text-sm text-gray-600 mb-2">
-                      {proposal.client_name && (
-                        <span>Client: {proposal.client_name}</span>
-                      )}
-                      {proposal.rfp_deadline && (
-                        <span className="flex items-center gap-1">
-                          <Calendar size={14} />
-                          Due: {formatDate(proposal.rfp_deadline)}
+                {/* Section Header */}
+                <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h2 className="text-xl font-semibold text-gray-900 mb-1">
+                        {section.title}
+                      </h2>
+                      <div className="flex items-center gap-3 text-sm text-gray-600">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${getSectionStatusColor(
+                            section.status
+                          )}`}
+                        >
+                          {section.status.replace('_', ' ').toUpperCase()}
                         </span>
-                      )}
+                        {section.page_target_min && section.page_target_max && (
+                          <span>
+                            Target: {section.page_target_min}-{section.page_target_max} pages
+                          </span>
+                        )}
+                        {section.current_pages !== undefined && (
+                          <span>Current: {section.current_pages} pages</span>
+                        )}
+                      </div>
                     </div>
-                    {proposal.notes && (
-                      <p className="text-gray-700 text-sm">{proposal.notes}</p>
-                    )}
-                    <div className="flex items-center gap-2 mt-3">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        proposal.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        proposal.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {proposal.status}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        Updated {formatDate(proposal.updated_at)}
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="flex gap-2 ml-4">
+                    {/* Export Button */}
                     <button
-                      onClick={() => handleViewProposal(proposal)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                      title="View Proposal"
+                      onClick={() => handleExportSection(section.id, section.title)}
+                      disabled={exportingSection === section.id}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Eye size={20} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm('Are you sure you want to delete this proposal?')) {
-                          deleteProposalMutation.mutate(proposal.id);
-                        }
-                      }}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                      title="Delete Proposal"
-                    >
-                      <Trash2 size={20} />
+                      {exportingSection === section.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Exporting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4" />
+                          <span>Export to Word</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
+
+                {/* Section Content */}
+                <div className="p-6">
+                  {section.contents && section.contents.length > 0 ? (
+                    <div className="space-y-4">
+                      {section.contents.map((content) => (
+                        <div key={content.id} className="border-l-4 border-blue-200 pl-4">
+                          {content.title && (
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">
+                              {content.title}
+                            </h3>
+                          )}
+                          <div
+                            className="prose prose-sm max-w-none text-gray-700"
+                            dangerouslySetInnerHTML={{ __html: content.content }}
+                          />
+                          {content.word_count && (
+                            <p className="text-xs text-gray-500 mt-2">
+                              {content.word_count} words
+                              {content.estimated_pages && ` • ~${content.estimated_pages} pages`}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No content added to this section yet.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Section Notes */}
+                {section.notes && (
+                  <div className="bg-yellow-50 border-t border-yellow-100 px-6 py-3">
+                    <div className="flex items-start gap-2">
+                      <MessageSquare className="w-4 h-4 text-yellow-600 mt-0.5" />
+                      <p className="text-sm text-yellow-800">{section.notes}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
-        ) : (
-          <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
-            <FileText size={48} className="mx-auto text-gray-400 mb-3" />
-            <p className="text-gray-600 font-medium mb-2">No proposals yet</p>
-            <p className="text-sm text-gray-500 mb-4">
-              Get started by creating your first proposal
-            </p>
-            <button
-              onClick={() => setViewMode('builder')}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
-            >
-              <Plus size={20} />
-              Create Proposal
-            </button>
+        )}
+
+        {/* Format Modal */}
+        {showFormatModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-auto">
+              <div className="p-6">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                  Export Formatting Instructions
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Optionally, provide instructions for Claude to format the exported document.
+                  Leave blank for default formatting.
+                </p>
+                <textarea
+                  value={formattingInstructions}
+                  onChange={(e) => setFormattingInstructions(e.target.value)}
+                  placeholder="Example: Use 12pt Times New Roman, 1.5 line spacing, add page numbers..."
+                  className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    onClick={() => {
+                      setShowFormatModal(false);
+                      setFormattingInstructions('');
+                      setCurrentExportSection(null);
+                    }}
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={executeExport}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Export
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
