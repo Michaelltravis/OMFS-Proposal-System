@@ -1,7 +1,8 @@
 """
 Proposal Builder API endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
@@ -27,6 +28,7 @@ from app.schemas.proposal import (
     RFPRequirementResponse,
 )
 from app.schemas.common import PaginatedResponse
+from app.services.document_export_service import document_export_service
 import math
 
 router = APIRouter()
@@ -394,3 +396,132 @@ def delete_requirement(
     db.commit()
 
     return None
+
+
+# Export Endpoints
+@router.post("/{proposal_id}/sections/{section_id}/export")
+def export_section(
+    proposal_id: int,
+    section_id: int,
+    formatting_instructions: Optional[str] = Body(None, embed=True),
+    db: Session = Depends(get_db),
+):
+    """
+    Export a proposal section to Word document
+
+    Args:
+        proposal_id: ID of the proposal
+        section_id: ID of the section to export
+        formatting_instructions: Optional Claude-generated formatting instructions
+
+    Returns:
+        Word document file
+    """
+    # Verify section exists
+    section = db.query(ProposalSection).filter(
+        ProposalSection.id == section_id,
+        ProposalSection.proposal_id == proposal_id,
+    ).first()
+
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found")
+
+    # Get all content for this section
+    contents = db.query(ProposalContent).filter(
+        ProposalContent.section_id == section_id
+    ).order_by(ProposalContent.order).all()
+
+    # Prepare content data
+    content_data = [
+        {
+            'title': content.title,
+            'content': content.content
+        }
+        for content in contents
+    ]
+
+    # Generate Word document
+    doc_buffer = document_export_service.export_section_to_docx(
+        section_title=section.title,
+        section_contents=content_data,
+        formatting_instructions=formatting_instructions
+    )
+
+    # Create filename
+    filename = f"{section.title.replace(' ', '_')}.docx"
+
+    # Return as streaming response
+    return StreamingResponse(
+        doc_buffer,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+
+@router.post("/{proposal_id}/export")
+def export_proposal(
+    proposal_id: int,
+    formatting_instructions: Optional[str] = Body(None, embed=True),
+    db: Session = Depends(get_db),
+):
+    """
+    Export a full proposal to Word document
+
+    Args:
+        proposal_id: ID of the proposal
+        formatting_instructions: Optional Claude-generated formatting instructions
+
+    Returns:
+        Word document file
+    """
+    # Get proposal
+    proposal = db.query(Proposal).filter(Proposal.id == proposal_id).first()
+
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+
+    # Get all sections
+    sections = db.query(ProposalSection).filter(
+        ProposalSection.proposal_id == proposal_id
+    ).order_by(ProposalSection.order).all()
+
+    # Prepare section data
+    sections_data = []
+    for section in sections:
+        contents = db.query(ProposalContent).filter(
+            ProposalContent.section_id == section.id
+        ).order_by(ProposalContent.order).all()
+
+        content_data = [
+            {
+                'title': content.title,
+                'content': content.content
+            }
+            for content in contents
+        ]
+
+        sections_data.append({
+            'title': section.title,
+            'contents': content_data
+        })
+
+    # Generate Word document
+    doc_buffer = document_export_service.export_full_proposal_to_docx(
+        proposal_title=proposal.title,
+        sections=sections_data,
+        formatting_instructions=formatting_instructions
+    )
+
+    # Create filename
+    filename = f"{proposal.title.replace(' ', '_')}.docx"
+
+    # Return as streaming response
+    return StreamingResponse(
+        doc_buffer,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )

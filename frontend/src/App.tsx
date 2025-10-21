@@ -24,7 +24,7 @@ function App() {
             <Route index element={<Navigate to="/repository" replace />} />
             <Route path="repository" element={<RepositoryPage />} />
             <Route path="proposals" element={<ProposalPage />} />
-            <Route path="proposals/:id" element={<ProposalPage />} />
+            <Route path="proposals/:proposalId" element={<ProposalPage />} />
           </Route>
         </Routes>
       </Router>
