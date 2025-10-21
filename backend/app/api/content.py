@@ -30,30 +30,35 @@ def get_content_blocks(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     section_type: Optional[str] = None,
-    search: Optional[str] = None,
+    query: Optional[str] = None,
+    tags: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ):
     """Get all content blocks with pagination and filtering"""
-    query = db.query(ContentBlock).filter(ContentBlock.is_deleted == False)
+    db_query = db.query(ContentBlock).filter(ContentBlock.is_deleted == False)
 
     # Apply filters
     if section_type:
-        query = query.filter(ContentBlock.section_type == section_type)
+        db_query = db_query.filter(ContentBlock.section_type == section_type)
 
-    if search:
-        query = query.filter(
+    if query:
+        db_query = db_query.filter(
             or_(
-                ContentBlock.title.ilike(f"%{search}%"),
-                ContentBlock.content.ilike(f"%{search}%"),
+                ContentBlock.title.ilike(f"%{query}%"),
+                ContentBlock.content.ilike(f"%{query}%"),
             )
         )
 
+    # Filter by tags (OR logic - blocks with any of the specified tags)
+    if tags and len(tags) > 0:
+        db_query = db_query.join(ContentBlock.tags).filter(Tag.name.in_(tags))
+
     # Get total count
-    total = query.count()
+    total = db_query.count()
 
     # Apply pagination
     offset = (page - 1) * limit
-    items = query.order_by(ContentBlock.updated_at.desc()).offset(offset).limit(limit).all()
+    items = db_query.order_by(ContentBlock.updated_at.desc()).offset(offset).limit(limit).all()
 
     pages = math.ceil(total / limit)
 
