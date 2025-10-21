@@ -79,22 +79,11 @@ export interface SectionType {
 
 // Proposal Builder Types
 
-export type ProposalStatus =
-  | 'draft'
-  | 'in_progress'
-  | 'review'
-  | 'completed'
-  | 'archived';
+export type ProposalStatus = 'draft' | 'in_progress' | 'review' | 'completed' | 'archived';
 
-export type SectionStatus =
-  | 'not_started'
-  | 'in_progress'
-  | 'completed';
+export type SectionStatus = 'not_started' | 'in_progress' | 'completed' | 'pending';
 
-export type RequirementStatus =
-  | 'not_addressed'
-  | 'partially_addressed'
-  | 'fully_addressed';
+export type RequirementStatus = 'not_addressed' | 'partially_addressed' | 'fully_addressed';
 
 export interface Proposal {
   id: number;
