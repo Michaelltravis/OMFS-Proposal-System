@@ -1,11 +1,11 @@
 /**
  * Content Editor Modal - Create and edit content blocks with Claude AI assistance
  */
-import { useState } from 'react';
-import { X, Sparkles, Loader2, Save } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Sparkles, Loader2, Save, Plus, Tag as TagIcon } from 'lucide-react';
 import { RichTextEditor } from './common/RichTextEditor';
 import { contentService } from '../services/contentService';
-import type { ContentBlock } from '../types';
+import type { ContentBlock, SectionType } from '../types';
 
 interface ContentEditorModalProps {
   block?: ContentBlock | null;
@@ -21,6 +21,14 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showClaudePanel, setShowClaudePanel] = useState(false);
+  const [availableSectionTypes, setAvailableSectionTypes] = useState<SectionType[]>([]);
+  const [selectedSectionTypeIds, setSelectedSectionTypeIds] = useState<number[]>(
+    block?.section_types?.map(st => st.id) || []
+  );
+  const [showNewSectionTypeForm, setShowNewSectionTypeForm] = useState(false);
+  const [newSectionTypeName, setNewSectionTypeName] = useState('');
+  const [newSectionTypeDisplayName, setNewSectionTypeDisplayName] = useState('');
+  const [newSectionTypeDescription, setNewSectionTypeDescription] = useState('');
 
   const sectionTypes = [
     { value: 'technical_approach', label: 'Technical Approach' },
@@ -29,6 +37,53 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
     { value: 'qualifications', label: 'Qualifications' },
     { value: 'pricing', label: 'Pricing' },
   ];
+
+  useEffect(() => {
+    fetchSectionTypes();
+  }, []);
+
+  const fetchSectionTypes = async () => {
+    try {
+      const sectionTypes = await contentService.getSectionTypes();
+      setAvailableSectionTypes(sectionTypes);
+    } catch (error) {
+      console.error('Error fetching section types:', error);
+    }
+  };
+
+  const toggleSectionType = (sectionTypeId: number) => {
+    setSelectedSectionTypeIds((prev) =>
+      prev.includes(sectionTypeId)
+        ? prev.filter((id) => id !== sectionTypeId)
+        : [...prev, sectionTypeId]
+    );
+  };
+
+  const handleCreateNewSectionType = async () => {
+    if (!newSectionTypeName.trim() || !newSectionTypeDisplayName.trim()) {
+      alert('Please enter both name and display name for the section type.');
+      return;
+    }
+
+    try {
+      const newSectionType = await contentService.createSectionType({
+        name: newSectionTypeName.toLowerCase().replace(/\s+/g, '_'),
+        display_name: newSectionTypeDisplayName,
+        description: newSectionTypeDescription || undefined,
+        color: '#' + Math.floor(Math.random()*16777215).toString(16), // Random color
+      });
+
+      setAvailableSectionTypes([...availableSectionTypes, newSectionType]);
+      setSelectedSectionTypeIds([...selectedSectionTypeIds, newSectionType.id]);
+      setShowNewSectionTypeForm(false);
+      setNewSectionTypeName('');
+      setNewSectionTypeDisplayName('');
+      setNewSectionTypeDescription('');
+    } catch (error) {
+      console.error('Error creating section type:', error);
+      alert('Failed to create section type. It may already exist.');
+    }
+  };
 
   const handleSave = async () => {
     try {
@@ -39,6 +94,7 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
         section_type: sectionType,
         content,
         quality_rating: block?.quality_rating || 3.0,
+        section_type_ids: selectedSectionTypeIds,
       };
 
       if (block?.id) {
@@ -143,6 +199,98 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Section Type Labels */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Section Type Labels
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewSectionTypeForm(!showNewSectionTypeForm)}
+                    className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Create New
+                  </button>
+                </div>
+
+                {/* New Section Type Form */}
+                {showNewSectionTypeForm && (
+                  <div className="mb-3 p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
+                    <input
+                      type="text"
+                      value={newSectionTypeDisplayName}
+                      onChange={(e) => setNewSectionTypeDisplayName(e.target.value)}
+                      placeholder="Display Name (e.g., Technical Approach)"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    <input
+                      type="text"
+                      value={newSectionTypeName}
+                      onChange={(e) => setNewSectionTypeName(e.target.value)}
+                      placeholder="Name (e.g., technical_approach)"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    <textarea
+                      value={newSectionTypeDescription}
+                      onChange={(e) => setNewSectionTypeDescription(e.target.value)}
+                      placeholder="Description (optional)"
+                      rows={2}
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCreateNewSectionType}
+                        className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
+                      >
+                        Create
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewSectionTypeForm(false)}
+                        className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Section Type Selection */}
+                <div className="flex flex-wrap gap-2">
+                  {availableSectionTypes.map((st) => {
+                    const isSelected = selectedSectionTypeIds.includes(st.id);
+                    return (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => toggleSectionType(st.id)}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm transition-colors ${
+                          isSelected
+                            ? 'text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                        style={{
+                          backgroundColor: isSelected ? st.color : undefined,
+                        }}
+                        title={st.description}
+                      >
+                        <TagIcon className="w-3 h-3" />
+                        {st.display_name}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {availableSectionTypes.length === 0 && (
+                  <p className="text-sm text-gray-500 italic">
+                    No section types available. Create one above.
+                  </p>
+                )}
               </div>
 
               {/* Content Editor */}

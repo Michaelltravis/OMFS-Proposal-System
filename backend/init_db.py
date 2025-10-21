@@ -32,7 +32,7 @@ def init_database(drop_existing=False):
 def seed_sample_data():
     """Add sample data for testing"""
     from app.core.database import SessionLocal
-    from app.models.content import Tag, ContentBlock
+    from app.models.content import Tag, SectionType, ContentBlock
     from app.models.proposal import Proposal, ProposalSection
 
     db = SessionLocal()
@@ -56,6 +56,48 @@ def seed_sample_data():
 
         db.commit()
         print("Sample tags created")
+
+        # Create initial section types
+        section_types = [
+            SectionType(
+                name="technical_approach",
+                display_name="Technical Approach",
+                description="Detailed technical explanations with methodologies, technologies, and implementation strategies",
+                color="#3b82f6"
+            ),
+            SectionType(
+                name="past_performance",
+                display_name="Past Performance",
+                description="Past performance narratives highlighting measurable outcomes and relevant experience",
+                color="#10b981"
+            ),
+            SectionType(
+                name="executive_summary",
+                display_name="Executive Summary",
+                description="Concise, persuasive summaries highlighting key value propositions and differentiators",
+                color="#f59e0b"
+            ),
+            SectionType(
+                name="qualifications",
+                display_name="Qualifications",
+                description="Organizational qualifications, team credentials, and capability statements",
+                color="#8b5cf6"
+            ),
+            SectionType(
+                name="pricing",
+                display_name="Pricing",
+                description="Pricing narratives explaining cost structure and competitive advantages",
+                color="#06b6d4"
+            ),
+        ]
+
+        for section_type in section_types:
+            existing = db.query(SectionType).filter(SectionType.name == section_type.name).first()
+            if not existing:
+                db.add(section_type)
+
+        db.commit()
+        print("Section types created")
 
         # Create sample content block
         sample_block = ContentBlock(

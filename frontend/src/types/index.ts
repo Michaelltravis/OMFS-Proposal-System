@@ -24,6 +24,7 @@ export interface ContentBlock {
   updated_by?: string;
   is_deleted: boolean;
   tags?: Tag[];
+  section_types?: SectionType[];
   parent?: ContentBlock;
   children?: ContentBlock[];
 }
@@ -61,6 +62,16 @@ export interface Tag {
   id: number;
   name: string;
   category?: string;
+  color?: string;
+  usage_count: number;
+  created_at: string;
+}
+
+export interface SectionType {
+  id: number;
+  name: string;
+  display_name: string;
+  description?: string;
   color?: string;
   usage_count: number;
   created_at: string;
