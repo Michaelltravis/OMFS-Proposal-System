@@ -2,11 +2,12 @@
  * Content Repository Page - Main library interface
  */
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, Filter, X } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Search, Plus, Filter, X, History, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import { contentService } from '../../services/contentService';
-import type { ContentBlock } from '../../types';
+import type { ContentBlock, ContentVersion } from '../../types';
 import { ContentEditorModal } from '../../components/ContentEditorModal';
+import * as DiffMatchPatch from 'diff-match-patch';
 
 export const RepositoryPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -281,6 +282,59 @@ const ContentBlockCard = ({ block, onClick }: { block: ContentBlock; onClick: ()
   );
 };
 
+// Helper function to strip HTML tags while preserving structure
+const stripHtml = (html: string): string => {
+  // Convert HTML to preserve document structure
+  let text = html
+    // Add double newlines after headings and paragraphs for proper spacing
+    .replace(/<\/h[1-6]>/gi, '\n\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    // Convert list items to newlines
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<li>/gi, '• ')
+    // Convert line breaks
+    .replace(/<br\s*\/?>/gi, '\n')
+    // Add spacing after closing block elements
+    .replace(/<\/ul>/gi, '\n')
+    .replace(/<\/ol>/gi, '\n');
+
+  // Now strip remaining HTML tags
+  const div = document.createElement('div');
+  div.innerHTML = text;
+
+  // Get text and clean up excessive newlines (max 2 consecutive)
+  return (div.textContent || div.innerText || '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
+// Helper function to generate diff HTML
+const generateDiffHtml = (oldText: string, newText: string): string => {
+  const dmp = new DiffMatchPatch.diff_match_patch();
+  const diffs = dmp.diff_main(oldText, newText);
+  dmp.diff_cleanupSemantic(diffs);
+
+  let html = '';
+  for (const [operation, text] of diffs) {
+    // Escape HTML but preserve newlines for CSS white-space handling
+    const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    if (operation === -1) {
+      // Deletion - red with strikethrough
+      html += `<span style="background-color: #fee; color: #c00; text-decoration: line-through;">${escapedText}</span>`;
+    } else if (operation === 1) {
+      // Addition - blue/green
+      html += `<span style="background-color: #dfd; color: #080;">${escapedText}</span>`;
+    } else {
+      // No change
+      html += `<span>${escapedText}</span>`;
+    }
+  }
+
+  return html;
+};
+
 // Content Detail Modal Component
 const ContentDetailModal = ({
   block,
@@ -291,6 +345,38 @@ const ContentDetailModal = ({
   onClose: () => void;
   onEdit: (block: ContentBlock) => void;
 }) => {
+  const [activeTab, setActiveTab] = useState<'content' | 'versions'>('content');
+  const [showingDiffFor, setShowingDiffFor] = useState<number | null>(null);
+  const queryClient = useQueryClient();
+
+  // Fetch versions
+  const { data: versions, isLoading: versionsLoading } = useQuery({
+    queryKey: ['content-versions', block.id],
+    queryFn: () => contentService.getVersions(block.id),
+    enabled: activeTab === 'versions',
+  });
+
+  // Revert mutation
+  const revertMutation = useMutation({
+    mutationFn: ({ versionId }: { versionId: number }) =>
+      contentService.revertToVersion(block.id, versionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['content-blocks'] });
+      queryClient.invalidateQueries({ queryKey: ['content-versions', block.id] });
+      alert('Successfully reverted to selected version!');
+      onClose();
+    },
+    onError: (error: any) => {
+      alert(`Failed to revert: ${error.message}`);
+    },
+  });
+
+  const handleRevert = (versionId: number, versionNumber: number) => {
+    if (confirm(`Are you sure you want to revert to Version ${versionNumber}? This will create a new version with that content.`)) {
+      revertMutation.mutate({ versionId });
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -329,26 +415,170 @@ const ContentDetailModal = ({
           </button>
         </div>
 
+        {/* Tabs */}
+        <div className="border-b border-gray-200">
+          <div className="flex px-6">
+            <button
+              onClick={() => setActiveTab('content')}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'content'
+                  ? 'border-primary-600 text-primary-700'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Content
+            </button>
+            <button
+              onClick={() => setActiveTab('versions')}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                activeTab === 'versions'
+                  ? 'border-primary-600 text-primary-700'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              Version History
+              {versions && versions.length > 0 && (
+                <span className="ml-1 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs">
+                  {versions.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* Modal Content - Scrollable */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div
-            className="prose prose-sm max-w-none"
-            dangerouslySetInnerHTML={{ __html: block.content }}
-          />
+          {activeTab === 'content' ? (
+            <div
+              className="prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{ __html: block.content }}
+            />
+          ) : (
+            <div>
+              {versionsLoading ? (
+                <div className="text-center py-12 text-gray-500">Loading version history...</div>
+              ) : versions && versions.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 className="text-sm font-semibold text-blue-900 mb-1">How Version History Works</h3>
+                    <p className="text-xs text-blue-700">
+                      Every time you edit this content block, a snapshot is saved. You can view past versions and revert to any previous version if needed.
+                    </p>
+                  </div>
+                  {versions.map((version, index) => {
+                    const previousVersion = versions[index + 1];
+                    const isShowingDiff = showingDiffFor === version.id;
+
+                    return (
+                      <div key={version.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold text-gray-900">
+                                Version {version.version_number}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(version.created_at).toLocaleString()}
+                              </span>
+                            </div>
+                            {version.change_description && (
+                              <p className="text-sm text-gray-600 mb-2">{version.change_description}</p>
+                            )}
+                            <div className="text-xs text-gray-500">
+                              <strong>Title:</strong> {version.title}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {previousVersion && (
+                              <button
+                                onClick={() => setShowingDiffFor(isShowingDiff ? null : version.id)}
+                                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
+                                title={isShowingDiff ? "Hide changes" : "View changes from previous version"}
+                              >
+                                {isShowingDiff ? (
+                                  <>
+                                    <EyeOff className="w-3.5 h-3.5" />
+                                    Hide Changes
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye className="w-3.5 h-3.5" />
+                                    View Changes
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleRevert(version.id, version.version_number)}
+                              disabled={revertMutation.isPending}
+                              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Revert to this version"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              Revert
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-3 p-3 bg-gray-50 rounded border border-gray-100">
+                          {isShowingDiff && previousVersion ? (
+                            <div>
+                              <div className="mb-2 flex items-center gap-2 text-xs text-gray-600">
+                                <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded">Deleted</span>
+                                <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">Added</span>
+                                <span className="ml-auto">Comparing with Version {previousVersion.version_number}</span>
+                              </div>
+                              <div
+                                className="prose prose-xs max-w-none text-sm"
+                                style={{ whiteSpace: 'pre-wrap' }}
+                                dangerouslySetInnerHTML={{
+                                  __html: generateDiffHtml(
+                                    stripHtml(previousVersion.content),
+                                    stripHtml(version.content)
+                                  ),
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div
+                              className="prose prose-xs max-w-none text-sm line-clamp-4"
+                              dangerouslySetInnerHTML={{ __html: version.content }}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <History className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 mb-1">No version history yet</p>
+                  <p className="text-sm text-gray-400">
+                    Version history will be created when you edit this content block.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Modal Footer */}
         <div className="flex items-center justify-between p-6 border-t border-gray-200">
           <div className="flex gap-2">
-            <button className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-              Copy Content
-            </button>
-            <button
-              onClick={() => onEdit(block)}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Edit
-            </button>
+            {activeTab === 'content' && (
+              <>
+                <button className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+                  Copy Content
+                </button>
+                <button
+                  onClick={() => onEdit(block)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Edit
+                </button>
+              </>
+            )}
           </div>
           <button
             onClick={onClose}
