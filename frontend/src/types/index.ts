@@ -18,6 +18,8 @@ export interface ContentBlock {
   quality_rating?: number;
   usage_count: number;
   customization_history?: CustomizationHistoryEntry[];
+  track_changes_enabled?: boolean;
+  tracked_changes_metadata?: TrackedChangesMetadata;
   created_at: string;
   updated_at?: string;
   created_by?: string;
@@ -33,6 +35,19 @@ export interface CustomizationHistoryEntry {
   date: string;
   changes: string;
   level: 'light' | 'moderate' | 'heavy';
+}
+
+export interface TrackedChange {
+  id: string;
+  type: 'insert' | 'delete';
+  user: string;
+  user_id: string;
+  timestamp: string;
+  status: 'pending' | 'accepted' | 'rejected';
+}
+
+export interface TrackedChangesMetadata {
+  changes: TrackedChange[];
 }
 
 export interface ContentChunk {

@@ -1,6 +1,6 @@
 /**
  * TipTap Rich Text Editor Component
- * Supports: headings, bold, italic, bullets, tables
+ * Supports: headings, bold, italic, bullets, tables, track changes
  */
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -23,12 +23,16 @@ import {
   RemoveFormatting,
 } from 'lucide-react';
 import { useEffect } from 'react';
+import { InsertionMark, DeletionMark } from '../../extensions/TrackChangesExtensions';
 
 interface RichTextEditorProps {
   content: string;
   onChange: (html: string) => void;
   placeholder?: string;
   editable?: boolean;
+  trackChangesEnabled?: boolean;
+  currentUser?: { name: string; id: string };
+  onTrackChange?: (changeId: string, changeType: 'insert' | 'delete', user: string, userId: string, timestamp: string) => void;
 }
 
 const MenuBar = ({ editor }: { editor: Editor | null }) => {
@@ -176,6 +180,9 @@ export const RichTextEditor = ({
   onChange,
   placeholder = 'Start typing...',
   editable = true,
+  trackChangesEnabled = false,
+  currentUser = { name: 'Unknown User', id: 'unknown' },
+  onTrackChange,
 }: RichTextEditorProps) => {
   const editor = useEditor({
     extensions: [
@@ -190,10 +197,62 @@ export const RichTextEditor = ({
       TableRow,
       TableHeader,
       TableCell,
+      InsertionMark,
+      DeletionMark,
     ],
     content,
     editable,
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor, transaction }) => {
+      // Handle track changes if enabled
+      if (trackChangesEnabled && transaction.docChanged) {
+        const { from, to } = transaction.selection;
+        const text = transaction.doc.textBetween(from, to);
+
+        // Check if this is an insertion or deletion
+        transaction.steps.forEach((step: any) => {
+          if (step.slice && step.slice.content.size > 0) {
+            // Insertion
+            const changeId = `change-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const timestamp = new Date().toISOString();
+
+            // Mark the inserted text
+            editor.chain()
+              .setTextSelection({ from: step.from, to: step.from + step.slice.content.size })
+              .setMark('insertion', {
+                'data-change-id': changeId,
+                'data-change-type': 'insert',
+                'data-user': currentUser.name,
+                'data-user-id': currentUser.id,
+                'data-timestamp': timestamp,
+              })
+              .run();
+
+            if (onTrackChange) {
+              onTrackChange(changeId, 'insert', currentUser.name, currentUser.id, timestamp);
+            }
+          } else if (step.from !== undefined && step.to !== undefined && step.from < step.to) {
+            // Deletion - mark the text as deleted instead of removing it
+            const changeId = `change-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const timestamp = new Date().toISOString();
+
+            editor.chain()
+              .setTextSelection({ from: step.from, to: step.to })
+              .setMark('deletion', {
+                'data-change-id': changeId,
+                'data-change-type': 'delete',
+                'data-user': currentUser.name,
+                'data-user-id': currentUser.id,
+                'data-timestamp': timestamp,
+              })
+              .run();
+
+            if (onTrackChange) {
+              onTrackChange(changeId, 'delete', currentUser.name, currentUser.id, timestamp);
+            }
+          }
+        });
+      }
+
       onChange(editor.getHTML());
     },
     editorProps: {
@@ -276,6 +335,20 @@ export const RichTextEditor = ({
         }
         .tiptap-content .ProseMirror em {
           font-style: italic;
+        }
+
+        /* Track Changes Styles */
+        .tiptap-content .ProseMirror .track-change-insert {
+          background-color: #d4edda;
+          border-bottom: 2px solid #28a745;
+          color: #155724;
+          padding: 0 2px;
+        }
+        .tiptap-content .ProseMirror .track-change-delete {
+          background-color: #f8d7da;
+          text-decoration: line-through;
+          color: #721c24;
+          padding: 0 2px;
         }
       `}</style>
     </div>
