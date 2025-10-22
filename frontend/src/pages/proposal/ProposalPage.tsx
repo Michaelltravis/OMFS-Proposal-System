@@ -7,6 +7,7 @@ import { Download, FileText, Loader2, MessageSquare, ChevronDown, ChevronUp, Plu
 import { proposalService } from '../../services/proposalService';
 import { contentService } from '../../services/contentService';
 import { ContentSearchModal } from '../../components/ContentSearchModal';
+import { SectionContentModal } from '../../components/SectionContentModal';
 import { RichTextEditor } from '../../components/common/RichTextEditor';
 import type { Proposal, ProposalSection } from '../../types';
 import { sanitizeHtml } from '../../utils/sanitizer';
@@ -27,6 +28,8 @@ export const ProposalPage = () => {
   const [editingContent, setEditingContent] = useState<{ sectionId: number; contentId: number; content: string; title?: string } | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editMode, setEditMode] = useState<'visual' | 'html'>('visual');
+  const [showSectionContentModal, setShowSectionContentModal] = useState(false);
+  const [creatingContentForSection, setCreatingContentForSection] = useState<ProposalSection | null>(null);
 
   // Load proposal and sections
   useEffect(() => {
@@ -164,6 +167,41 @@ export const ProposalPage = () => {
     } catch (error) {
       console.error('Error updating content:', error);
       alert('Failed to update content. Please try again.');
+    }
+  };
+
+  const openCreateContent = (section: ProposalSection) => {
+    setCreatingContentForSection(section);
+    setShowSectionContentModal(true);
+  };
+
+  const handleSaveNewContent = async (content: string) => {
+    if (!proposalId || !creatingContentForSection) return;
+
+    try {
+      setAddingContent(true);
+
+      // Add to section - order is based on current content count
+      const order = (creatingContentForSection.contents?.length || 0) + 1;
+
+      await proposalService.addContentToSection(
+        parseInt(proposalId),
+        creatingContentForSection.id,
+        {
+          content,
+          order,
+          is_custom: true,
+        }
+      );
+
+      setShowSectionContentModal(false);
+      setCreatingContentForSection(null);
+      await loadProposal(parseInt(proposalId));
+    } catch (error) {
+      console.error('Error creating content:', error);
+      alert('Failed to create content. Please try again.');
+    } finally {
+      setAddingContent(false);
     }
   };
 
@@ -362,6 +400,7 @@ export const ProposalPage = () => {
                           <span>Add from Library</span>
                         </button>
                         <button
+                          onClick={() => openCreateContent(section)}
                           className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                         >
                           <Plus className="w-4 h-4" />
@@ -609,6 +648,20 @@ export const ProposalPage = () => {
           onAddContent={handleAddContent}
           sectionId={currentSection || 0}
         />
+
+        {/* Section Content Modal with Google Drive Integration */}
+        {creatingContentForSection && (
+          <SectionContentModal
+            isOpen={showSectionContentModal}
+            sectionTitle={creatingContentForSection.title}
+            sectionType={creatingContentForSection.section_type}
+            onSave={handleSaveNewContent}
+            onClose={() => {
+              setShowSectionContentModal(false);
+              setCreatingContentForSection(null);
+            }}
+          />
+        )}
       </div>
     </div>
   );
