@@ -9,6 +9,7 @@ import type { ContentBlock, ContentVersion } from '../../types';
 import { ContentEditorModal } from '../../components/ContentEditorModal';
 import { AdvancedFilterModal } from '../../components/AdvancedFilterModal';
 import * as DiffMatchPatch from 'diff-match-patch';
+import { sanitizeHtml } from '../../utils/sanitizer';
 
 export const RepositoryPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -655,7 +656,7 @@ const ContentDetailModal = ({
           {activeTab === 'content' ? (
             <div
               className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: block.content }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(block.content) }}
             />
           ) : (
             <div>
@@ -735,17 +736,17 @@ const ContentDetailModal = ({
                                 className="prose prose-xs max-w-none text-sm"
                                 style={{ whiteSpace: 'pre-wrap' }}
                                 dangerouslySetInnerHTML={{
-                                  __html: generateDiffHtml(
+                                  __html: sanitizeHtml(generateDiffHtml(
                                     stripHtml(previousVersion.content),
                                     stripHtml(version.content)
-                                  ),
+                                  )),
                                 }}
                               />
                             </div>
                           ) : (
                             <div
                               className="prose prose-xs max-w-none text-sm line-clamp-4"
-                              dangerouslySetInnerHTML={{ __html: version.content }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(version.content) }}
                             />
                           )}
                         </div>
