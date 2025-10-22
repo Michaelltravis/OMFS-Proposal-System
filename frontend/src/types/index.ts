@@ -269,3 +269,58 @@ export interface GoogleDriveSearchResponse {
   files: GoogleDriveFile[];
   total_count: number;
 }
+
+// Intelligent Search Types
+
+export interface QueryInterpretation {
+  keywords: string[];
+  intent: string;
+  section_suggestions: string[];
+  enhanced_query: string;
+}
+
+export interface ContentChunk {
+  chunk_index: number;
+  text: string;
+  start_position: number;
+  end_position: number;
+  length: number;
+  summary?: string;
+}
+
+export interface LibraryResult {
+  id: number;
+  title: string;
+  section_type?: string;
+  content: string;
+  word_count?: number;
+  quality_rating?: number;
+  usage_count: number;
+  source: string;
+}
+
+export interface DriveResult {
+  id: string;
+  name: string;
+  mime_type: string;
+  web_view_link?: string;
+  modified_time?: string;
+  source: string;
+  has_content: boolean;
+  chunks: ContentChunk[];
+}
+
+export interface IntelligentSearchRequest {
+  query: string;
+  section_type?: string;
+  include_library?: boolean;
+  include_drive?: boolean;
+  max_results?: number;
+}
+
+export interface IntelligentSearchResponse {
+  query: string;
+  interpretation: QueryInterpretation;
+  library_results: LibraryResult[];
+  drive_results: DriveResult[];
+}

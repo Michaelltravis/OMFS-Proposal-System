@@ -2,13 +2,17 @@
 Google Drive API integration service
 """
 import json
+import io
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaIoBaseDownload
 from sqlalchemy.orm import Session
+import pdfplumber
+from docx import Document
 
 from app.core.config import settings
 from app.models.google_drive import GoogleDriveCredential
@@ -338,10 +342,10 @@ class GoogleDriveService:
             service = build("drive", "v3", credentials=creds)
 
             # Get file metadata
-            file = service.files().get(fileId=file_id, fields="mimeType").execute()
+            file = service.files().get(fileId=file_id, fields="mimeType,name").execute()
             mime_type = file.get("mimeType")
 
-            # Export Google Docs to plain text
+            # Handle Google Docs - export to plain text
             if mime_type == "application/vnd.google-apps.document":
                 content = (
                     service.files()
@@ -350,9 +354,150 @@ class GoogleDriveService:
                 )
                 return content.decode("utf-8")
 
-            # For other file types, we'd need different handling
-            # This is a basic implementation
+            # Handle Google Presentations - export to plain text
+            if mime_type == "application/vnd.google-apps.presentation":
+                content = (
+                    service.files()
+                    .export(fileId=file_id, mimeType="text/plain")
+                    .execute()
+                )
+                return content.decode("utf-8")
+
+            # Handle PDF files
+            if mime_type == "application/pdf":
+                request = service.files().get_media(fileId=file_id)
+                file_buffer = io.BytesIO()
+                downloader = MediaIoBaseDownload(file_buffer, request)
+                done = False
+                while not done:
+                    status, done = downloader.next_chunk()
+
+                file_buffer.seek(0)
+
+                # Extract text using pdfplumber
+                try:
+                    with pdfplumber.open(file_buffer) as pdf:
+                        text = ""
+                        for page in pdf.pages:
+                            page_text = page.extract_text()
+                            if page_text:
+                                text += page_text + "\n\n"
+                        return text.strip()
+                except Exception as e:
+                    raise ValueError(f"Error extracting PDF content: {e}")
+
+            # Handle Word documents (.docx)
+            if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                request = service.files().get_media(fileId=file_id)
+                file_buffer = io.BytesIO()
+                downloader = MediaIoBaseDownload(file_buffer, request)
+                done = False
+                while not done:
+                    status, done = downloader.next_chunk()
+
+                file_buffer.seek(0)
+
+                # Extract text using python-docx
+                try:
+                    doc = Document(file_buffer)
+                    text = ""
+                    for paragraph in doc.paragraphs:
+                        text += paragraph.text + "\n"
+                    return text.strip()
+                except Exception as e:
+                    raise ValueError(f"Error extracting Word document content: {e}")
+
+            # Handle PowerPoint files (.pptx)
+            if mime_type == "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+                request = service.files().get_media(fileId=file_id)
+                file_buffer = io.BytesIO()
+                downloader = MediaIoBaseDownload(file_buffer, request)
+                done = False
+                while not done:
+                    status, done = downloader.next_chunk()
+
+                file_buffer.seek(0)
+
+                # Extract text from PowerPoint
+                try:
+                    from pptx import Presentation
+                    prs = Presentation(file_buffer)
+                    text = ""
+                    for slide in prs.slides:
+                        for shape in slide.shapes:
+                            if hasattr(shape, "text"):
+                                text += shape.text + "\n"
+                    return text.strip()
+                except ImportError:
+                    # python-pptx not installed, return None
+                    return None
+                except Exception as e:
+                    raise ValueError(f"Error extracting PowerPoint content: {e}")
+
+            # Unsupported file type
             return None
 
         except HttpError as error:
             raise ValueError(f"Google Drive API error: {error}")
+
+    @staticmethod
+    def chunk_content(
+        content: str,
+        chunk_size: int = 1000,
+        overlap: int = 200
+    ) -> List[Dict[str, Any]]:
+        """
+        Chunk text content into smaller pieces with overlap
+
+        Args:
+            content: Text content to chunk
+            chunk_size: Maximum characters per chunk
+            overlap: Number of characters to overlap between chunks
+
+        Returns:
+            List of chunks with metadata
+        """
+        if not content:
+            return []
+
+        chunks = []
+        start = 0
+        chunk_index = 0
+
+        while start < len(content):
+            # Calculate end position
+            end = start + chunk_size
+
+            # Find the last sentence or paragraph boundary before chunk_size
+            if end < len(content):
+                # Try to break at paragraph
+                last_para = content.rfind("\n\n", start, end)
+                if last_para > start:
+                    end = last_para + 2
+                else:
+                    # Try to break at sentence
+                    last_period = max(
+                        content.rfind(". ", start, end),
+                        content.rfind(".\n", start, end),
+                        content.rfind("? ", start, end),
+                        content.rfind("! ", start, end)
+                    )
+                    if last_period > start:
+                        end = last_period + 2
+
+            chunk_text = content[start:end].strip()
+
+            if chunk_text:
+                chunks.append({
+                    "chunk_index": chunk_index,
+                    "text": chunk_text,
+                    "start_position": start,
+                    "end_position": end,
+                    "length": len(chunk_text)
+                })
+                chunk_index += 1
+
+            # Move start position with overlap
+            start = end - overlap if end < len(content) else len(content)
+
+        return chunks

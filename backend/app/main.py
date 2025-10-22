@@ -115,11 +115,12 @@ async def health_check():
 
 
 # Import and include API routers
-from app.api import content, proposals, google_drive
+from app.api import content, proposals, google_drive, intelligent_search
 
 app.include_router(content.router, prefix="/api/content", tags=["content"])
 app.include_router(proposals.router, prefix="/api/proposals", tags=["proposals"])
 app.include_router(google_drive.router, prefix="/api/google-drive", tags=["google-drive"])
+app.include_router(intelligent_search.router, prefix="/api/intelligent-search", tags=["intelligent-search"])
 # app.include_router(search.router, prefix="/api/search", tags=["search"])
 # app.include_router(claude.router, prefix="/api/claude", tags=["claude"])
 

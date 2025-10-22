@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { X, PanelRightClose, PanelRightOpen, Sparkles, Loader2 } from 'lucide-react';
 import { RichTextEditor } from './common/RichTextEditor';
 import { GoogleDriveSuggestions } from './GoogleDriveSuggestions';
 import { GoogleDriveConnect } from './GoogleDriveConnect';
+import { IntelligentContentSearch } from './IntelligentContentSearch';
+import { intelligentSearchService } from '../services/intelligentSearchService';
 import type { GoogleDriveFile } from '../types';
 
 interface SectionContentModalProps {
@@ -25,6 +27,8 @@ export const SectionContentModal: React.FC<SectionContentModalProps> = ({
   const [content, setContent] = useState(initialContent);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [isGoogleDriveConnected, setIsGoogleDriveConnected] = useState(false);
+  const [useIntelligentSearch, setUseIntelligentSearch] = useState(true);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
 
   if (!isOpen) return null;
 
@@ -42,6 +46,31 @@ export const SectionContentModal: React.FC<SectionContentModalProps> = ({
     }
   };
 
+  const handleAppendContent = (newContent: string, source: string) => {
+    // Append content with source attribution
+    const attribution = `\n<!-- Source: ${source} -->\n`;
+    setContent(content + attribution + newContent + '\n');
+  };
+
+  const handleCleanup = async () => {
+    if (!content.trim()) {
+      alert('No content to clean up');
+      return;
+    }
+
+    try {
+      setIsCleaningUp(true);
+      const result = await intelligentSearchService.cleanupContent(content);
+      setContent(result.cleaned);
+      alert('Content has been cleaned up and polished!');
+    } catch (error) {
+      console.error('Cleanup error:', error);
+      alert('Failed to clean up content. Please try again.');
+    } finally {
+      setIsCleaningUp(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -53,7 +82,7 @@ export const SectionContentModal: React.FC<SectionContentModalProps> = ({
 
         {/* Modal */}
         <div className={`relative bg-white rounded-lg shadow-xl w-full max-h-[90vh] flex flex-col transition-all ${
-          showSuggestions && isGoogleDriveConnected ? 'max-w-7xl' : 'max-w-4xl'
+          showSuggestions ? 'max-w-7xl' : 'max-w-4xl'
         }`}>
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -66,15 +95,13 @@ export const SectionContentModal: React.FC<SectionContentModalProps> = ({
             <div className="flex items-center gap-3">
               <GoogleDriveConnect onStatusChange={setIsGoogleDriveConnected} />
 
-              {isGoogleDriveConnected && (
-                <button
-                  onClick={() => setShowSuggestions(!showSuggestions)}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                  title={showSuggestions ? 'Hide suggestions' : 'Show suggestions'}
-                >
-                  {showSuggestions ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}
-                </button>
-              )}
+              <button
+                onClick={() => setShowSuggestions(!showSuggestions)}
+                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                title={showSuggestions ? 'Hide search panel' : 'Show search panel'}
+              >
+                {showSuggestions ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}
+              </button>
 
               <button
                 onClick={onClose}
@@ -89,7 +116,7 @@ export const SectionContentModal: React.FC<SectionContentModalProps> = ({
           <div className="flex-grow overflow-hidden flex">
             {/* Editor */}
             <div className={`flex-grow overflow-y-auto p-6 ${
-              showSuggestions && isGoogleDriveConnected ? 'border-r border-gray-200' : ''
+              showSuggestions ? 'border-r border-gray-200' : ''
             }`}>
               <RichTextEditor
                 content={content}
@@ -98,32 +125,57 @@ export const SectionContentModal: React.FC<SectionContentModalProps> = ({
               />
             </div>
 
-            {/* Google Drive Suggestions Panel */}
-            {showSuggestions && isGoogleDriveConnected && (
-              <div className="w-96 flex-shrink-0 overflow-y-auto p-6 bg-gray-50">
-                <GoogleDriveSuggestions
-                  sectionTitle={sectionTitle}
+            {/* Content Search Panel */}
+            {showSuggestions && (
+              <div className="w-[500px] flex-shrink-0 overflow-y-auto p-6 bg-gray-50">
+                <div className="mb-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">Content Search</h3>
+                  <p className="text-xs text-gray-600">
+                    Search for relevant content from the Content Library and Google Drive
+                  </p>
+                </div>
+                <IntelligentContentSearch
                   sectionType={sectionType}
-                  onFileSelect={handleFileSelect}
+                  onAppendContent={handleAppendContent}
                 />
               </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+          <div className="flex items-center justify-between p-6 border-t border-gray-200">
             <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
+              onClick={handleCleanup}
+              disabled={isCleaningUp || !content.trim()}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              title="Clean up and polish content with AI"
             >
-              Cancel
+              {isCleaningUp ? (
+                <>
+                  <Loader2 className="animate-spin" size={16} />
+                  Cleaning...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  Clean Up with Claude
+                </>
+              )}
             </button>
-            <button
-              onClick={handleSave}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Save Content
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Save Content
+              </button>
+            </div>
           </div>
         </div>
       </div>
