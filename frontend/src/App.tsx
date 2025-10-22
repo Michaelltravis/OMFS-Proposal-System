@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RepositoryPage } from './pages/repository/RepositoryPage';
 import { ProposalPage } from './pages/proposal/ProposalPage';
+import { GoogleDriveCallback } from './pages/GoogleDriveCallback';
 import { Layout } from './components/common/Layout';
 
 // Create React Query client
@@ -20,6 +21,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <Router>
         <Routes>
+          {/* OAuth callback route (standalone, no layout) */}
+          <Route path="/google-drive/callback" element={<GoogleDriveCallback />} />
+
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/repository" replace />} />
             <Route path="repository" element={<RepositoryPage />} />

@@ -233,3 +233,37 @@ export interface EditorState {
   isSaving: boolean;
   lastSaved?: string;
 }
+
+// Google Drive Integration Types
+
+export interface GoogleDriveAuthUrl {
+  auth_url: string;
+}
+
+export interface GoogleDriveStatus {
+  connected: boolean;
+  user_email?: string;
+  expires_at?: string;
+}
+
+export interface GoogleDriveFile {
+  id: string;
+  name: string;
+  mime_type: string;
+  web_view_link?: string;
+  modified_time?: string;
+  size?: number;
+  thumbnail_link?: string;
+  snippet?: string;
+}
+
+export interface GoogleDriveSearchRequest {
+  query: string;
+  section_type?: string;
+  max_results?: number;
+}
+
+export interface GoogleDriveSearchResponse {
+  files: GoogleDriveFile[];
+  total_count: number;
+}

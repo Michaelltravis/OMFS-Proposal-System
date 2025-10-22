@@ -10,6 +10,7 @@ from .proposal import (
     ProposalDocument,
     ProposalNote,
 )
+from .google_drive import GoogleDriveCredential
 
 __all__ = [
     "ContentBlock",
@@ -22,4 +23,5 @@ __all__ = [
     "RFPRequirement",
     "ProposalDocument",
     "ProposalNote",
+    "GoogleDriveCredential",
 ]
