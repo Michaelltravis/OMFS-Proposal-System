@@ -3,12 +3,12 @@
  * Handles authentication and file operations with Google Drive
  */
 import { apiClient } from './api';
-import {
+import type {
   GoogleDriveAuthUrl,
   GoogleDriveStatus,
   GoogleDriveSearchRequest,
   GoogleDriveSearchResponse,
-} from '../types';
+} from '../types/index';
 
 const BASE_URL = '/api/google-drive';
 
