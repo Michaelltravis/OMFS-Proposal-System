@@ -4,8 +4,8 @@
  */
 import React, { useState, useEffect } from 'react';
 import { Search, FileText, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
-import googleDriveService from '../services/googleDriveService';
-import { GoogleDriveFile } from '../types';
+import { googleDriveService } from '../services/googleDriveService';
+import type { GoogleDriveFile } from '../types';
 
 interface GoogleDriveSuggestionsProps {
   sectionTitle: string;

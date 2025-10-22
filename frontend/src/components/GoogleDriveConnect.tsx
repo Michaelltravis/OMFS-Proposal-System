@@ -4,8 +4,8 @@
  */
 import React, { useState, useEffect } from 'react';
 import { Cloud, CloudOff, LogOut, Loader2 } from 'lucide-react';
-import googleDriveService from '../services/googleDriveService';
-import { GoogleDriveStatus } from '../types';
+import { googleDriveService } from '../services/googleDriveService';
+import type { GoogleDriveStatus } from '../types';
 
 interface GoogleDriveConnectProps {
   onStatusChange?: (connected: boolean) => void;

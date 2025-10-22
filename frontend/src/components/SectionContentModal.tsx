@@ -3,7 +3,7 @@ import { X, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { RichTextEditor } from './common/RichTextEditor';
 import { GoogleDriveSuggestions } from './GoogleDriveSuggestions';
 import { GoogleDriveConnect } from './GoogleDriveConnect';
-import { GoogleDriveFile } from '../types';
+import type { GoogleDriveFile } from '../types';
 
 interface SectionContentModalProps {
   isOpen: boolean;
