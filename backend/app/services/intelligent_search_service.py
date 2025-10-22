@@ -9,7 +9,7 @@ from anthropic import Anthropic
 from app.core.config import settings
 from app.core.logging_config import get_logger
 from app.services.google_drive_service import GoogleDriveService
-from app.models.content_block import ContentBlock
+from app.models.content import ContentBlock
 from app.schemas.google_drive import GoogleDriveFile
 
 logger = get_logger(__name__)
