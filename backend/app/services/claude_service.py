@@ -2,8 +2,12 @@
 Claude AI Service for content generation and improvement
 """
 from typing import Optional
-from anthropic import Anthropic
+from anthropic import Anthropic, APIError, APIConnectionError, RateLimitError, APIStatusError
+from fastapi import HTTPException
 from app.core.config import settings
+from app.core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ClaudeService:
@@ -46,6 +50,8 @@ class ClaudeService:
         user_message = self._build_user_message(action, prompt, existing_content)
 
         try:
+            logger.info(f"Generating content with Claude: action={action}, section_type={section_type}")
+
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
@@ -57,10 +63,54 @@ class ClaudeService:
 
             # Extract text from response
             content = response.content[0].text
+            logger.info(f"Successfully generated content: {len(content)} characters")
             return content
 
+        except RateLimitError as e:
+            logger.error(f"Claude rate limit exceeded: {e}")
+            raise HTTPException(
+                status_code=429,
+                detail="AI service rate limit exceeded. Please try again in a few moments."
+            )
+
+        except APIConnectionError as e:
+            logger.error(f"Claude connection error: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail="AI service temporarily unavailable. Please check your internet connection and try again."
+            )
+
+        except APIStatusError as e:
+            logger.error(f"Claude API status error: {e.status_code} - {e.message}")
+            if e.status_code == 401:
+                raise HTTPException(
+                    status_code=500,
+                    detail="AI service authentication failed. Please contact support."
+                )
+            elif e.status_code >= 500:
+                raise HTTPException(
+                    status_code=503,
+                    detail="AI service is experiencing issues. Please try again later."
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"AI service error: {e.message}"
+                )
+
+        except APIError as e:
+            logger.error(f"Claude API error: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="AI content generation failed. Please try again."
+            )
+
         except Exception as e:
-            raise Exception(f"Claude API error: {str(e)}")
+            logger.exception(f"Unexpected error in Claude service: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="An unexpected error occurred during AI content generation."
+            )
 
     def _build_system_message(self, section_type: str) -> str:
         """Build the system message based on section type"""

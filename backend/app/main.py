@@ -1,10 +1,21 @@
 """
 Main FastAPI application
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
+from app.core.logging_config import setup_logging, get_logger
+import time
+
+# Initialize logging
+setup_logging(
+    level="DEBUG" if settings.DEBUG else "INFO",
+    json_logs=not settings.DEBUG,  # JSON logs in production, colored in debug
+    log_file="app.log" if not settings.DEBUG else None
+)
+
+logger = get_logger(__name__)
 
 # Create database tables (for development, use Alembic in production)
 # Base.metadata.create_all(bind=engine)
@@ -24,6 +35,63 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """
+    Log all HTTP requests with timing information
+
+    Logs:
+    - Request method and path
+    - Response status code
+    - Request duration in milliseconds
+    """
+    start_time = time.time()
+
+    # Log incoming request
+    logger.info(
+        f"{request.method} {request.url.path}",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "client": request.client.host if request.client else None,
+        }
+    )
+
+    # Process request
+    response = await call_next(request)
+
+    # Calculate duration
+    duration_ms = (time.time() - start_time) * 1000
+
+    # Log response
+    logger.info(
+        f"Response: {response.status_code} ({duration_ms:.2f}ms)",
+        extra={
+            "status_code": response.status_code,
+            "duration_ms": round(duration_ms, 2),
+            "path": request.url.path,
+        }
+    )
+
+    return response
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Application startup event"""
+    logger.info(
+        f"Starting {settings.APP_NAME} v{settings.APP_VERSION}",
+        extra={"debug_mode": settings.DEBUG}
+    )
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Application shutdown event"""
+    logger.info(f"Shutting down {settings.APP_NAME}")
 
 
 @app.get("/")

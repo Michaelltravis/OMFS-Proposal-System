@@ -6,6 +6,7 @@ import { useParams } from 'react-router';
 import { Download, FileText, Loader2, MessageSquare } from 'lucide-react';
 import { proposalService } from '../../services/proposalService';
 import type { Proposal, ProposalSection } from '../../types';
+import { sanitizeHtml } from '../../utils/sanitizer';
 
 export const ProposalPage = () => {
   const { proposalId } = useParams<{ proposalId: string }>();
@@ -211,7 +212,7 @@ export const ProposalPage = () => {
                           )}
                           <div
                             className="prose prose-sm max-w-none text-gray-700"
-                            dangerouslySetInnerHTML={{ __html: content.content }}
+                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(content.content) }}
                           />
                           {content.word_count && (
                             <p className="text-xs text-gray-500 mt-2">
