@@ -27,9 +27,9 @@ def upgrade():
         sa.Column('client_secret', sa.String(), nullable=True),
         sa.Column('scopes', sa.Text(), nullable=True),
         sa.Column('expiry', sa.DateTime(), nullable=True),
-        sa.Column('is_active', sa.Boolean(), nullable=True, server_default='true'),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
-        sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
+        sa.Column('is_active', sa.Boolean(), nullable=True, server_default='1'),
+        sa.Column('created_at', sa.DateTime(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
+        sa.Column('updated_at', sa.DateTime(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_google_drive_credentials_id'), 'google_drive_credentials', ['id'], unique=False)
