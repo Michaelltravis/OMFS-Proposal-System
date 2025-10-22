@@ -9,20 +9,59 @@ This system provides a content repository for storing, organizing, and reusing p
 ### Key Features
 
 ✅ **Completed:**
-- Content Repository with search and filtering
-- Rich text editor with TipTap (headings, bold, italic, lists, tables)
-- Content block CRUD operations (Create, Read, Update, Delete)
-- Tag system for categorizing content
-- Version history for content blocks
-- Claude AI integration for content generation (draft, improve, expand)
-- Responsive UI with Tailwind CSS
 
-🚧 **In Progress / Planned:**
-- Tag management UI
-- Delete/archive functionality UI
-- Word document import
-- Proposal builder interface
+**Content Repository:**
+- Content block CRUD operations (Create, Read, Update, Delete)
+- Rich text editor with TipTap (headings, bold, italic, lists, tables)
+- Advanced search and filtering with tag-based filters
+- Content search modal for browsing and selecting content
+- Tag system for categorizing content (create, assign, filter)
+- Section type labeling for content blocks
+- Version history with visual diff comparison
+- Track changes support for tags and section categories
+
+**AI Integration:**
+- Claude AI integration for content generation (draft, improve, expand)
+- Section-specific intelligent prompts
+- Real-time content generation with error handling
+
+**Proposal Builder:**
+- Full proposal builder interface with questionnaire
+- Draggable sections for reordering
+- Content block linking system to proposals
+- Add, edit, and delete content within proposal sections
+- Visual and HTML edit modes for content editing
+- Section content management with modal interface
+
+**Google Drive Integration:**
+- OAuth 2.0 authentication with Google Drive
+- Automatic search for relevant files based on section title/type
+- Custom search functionality within Google Drive
+- File metadata display (name, size, modified date)
+- Insert file references into proposal content
+- Connection status indicator and disconnect/reconnect functionality
+
+**Export & Import:**
+- Word document export with Claude formatting
+- Section-level export to Word
+
+**Security & Testing:**
+- XSS protection and input sanitization
+- Rate limiting for API endpoints
+- Comprehensive logging configuration
+- pytest testing infrastructure with test coverage for content and health endpoints
+
+**UI/UX:**
+- Responsive design with Tailwind CSS v4
+- Enhanced filtering and tag management UX
+- Track changes visualization
+- Collapsible sections and content panels
+
+🚧 **Planned:**
+- Word document import (export completed)
 - Vector embeddings with Qdrant for semantic search
+- Multi-user support with authentication
+- Advanced collaboration features
 
 ## Tech Stack
 
@@ -32,6 +71,9 @@ This system provides a content repository for storing, organizing, and reusing p
 - **ORM:** SQLAlchemy
 - **Migrations:** Alembic
 - **AI:** Anthropic Claude 3.5 Sonnet
+- **Integrations:** Google Drive API (OAuth 2.0)
+- **Testing:** pytest with asyncio support
+- **Security:** Rate limiting, XSS protection, structured logging
 - **Vector DB:** Qdrant (planned)
 
 ### Frontend
@@ -158,57 +200,97 @@ In the Content Editor modal, you'll see the **Claude AI Assistant** panel on the
 3. Click **"Expand Content"**
 4. Claude will add more detail while maintaining style
 
+### Using Google Drive Integration
+
+The Google Drive integration allows you to search and reference files from your Google Drive while building proposals.
+
+#### Setting Up Google Drive
+1. Follow the complete setup guide in `GOOGLE_DRIVE_SETUP.md`
+2. Configure OAuth credentials in Google Cloud Console
+3. Add credentials to `backend/.env`
+4. Restart the backend server
+
+#### Connecting Your Google Drive
+1. Open a proposal and click **"Add Content"** on any section
+2. In the section content modal, click the **"Connect Google Drive"** button in the header
+3. Authorize access in the Google OAuth window
+4. Once connected, the status will show "Connected to Google Drive"
+
+#### Finding Relevant Content
+1. When editing a section, the **Google Drive Suggestions** panel appears on the right
+2. The system automatically searches for files related to your section title and type
+3. Enter custom search terms and click **"Search"** to find specific content
+4. Click on any file to insert a reference link into your content
+5. Click the external link icon to open the file directly in Google Drive
+
+#### Managing Your Connection
+- View connection status in the section content modal header
+- Click the logout icon to disconnect
+- Toggle the suggestions panel on/off using the panel icon
+
 ## Current Status
 
-### ✅ Completed Today
+### 🎉 Recently Completed
 
-1. **Rich Text Editor Implementation**
-   - TipTap integration with all required formatting
-   - Custom font sizes (H1: 14pt, H2: 12pt, H3: 11pt, Body: 11pt)
-   - Body text and clear formatting buttons
-   - Scrollbar for large content blocks
+**Google Drive Integration (Latest):**
+- Full OAuth 2.0 authentication flow
+- Intelligent file search based on proposal sections
+- Side panel suggestions in content editor
+- File reference insertion into proposals
+- Complete documentation in `GOOGLE_DRIVE_SETUP.md`
 
-2. **Content Editor Modal**
-   - Full create/edit interface
-   - Form validation
-   - Save functionality
+**Security & Testing Infrastructure:**
+- XSS protection with HTML sanitization
+- Rate limiting middleware for API protection
+- Structured logging with rotation
+- pytest test suite with fixtures and coverage
 
-3. **Claude AI Backend Integration**
-   - Created claude_service.py with Anthropic API integration
-   - API endpoint at /api/content/ai/generate
-   - Support for draft, improve, and expand actions
-   - Intelligent system prompts per section type
-   - HTML output format for TipTap compatibility
+**Enhanced Proposal Builder:**
+- Content search modal for browsing content library
+- Drag-and-drop section reordering
+- In-line content editing with visual/HTML modes
+- Edit and delete content functionality
+- Section content management improvements
 
-4. **Frontend AI Integration**
-   - Connected Content Editor to Claude AI endpoint
-   - Real-time content generation
-   - Error handling
+**Content Management Improvements:**
+- Apply Filters functionality with tag counts
+- Enhanced tag creation and filtering
+- Version history with visual diff comparison
+- Track changes for tags and section categories
+- Advanced search and filtering capabilities
 
 ### 🔧 Configuration Required
 
-**Before testing Claude AI features, you must:**
-
-1. Create `.env` file in backend directory:
-   ```bash
-   cp backend/.env.example backend/.env
-   ```
-
-2. Add your Anthropic API key to `.env`:
+**For Claude AI features:**
+1. Create `.env` file: `cp backend/.env.example backend/.env`
+2. Add your Anthropic API key:
    ```env
    ANTHROPIC_API_KEY=sk-ant-your-actual-key-here
    ```
-
 3. Restart the backend server
 
-### 📋 Next Steps (Priorities for Tomorrow)
+**For Google Drive integration:**
+1. Set up Google Cloud project and OAuth credentials (see `GOOGLE_DRIVE_SETUP.md`)
+2. Add to `.env`:
+   ```env
+   GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=your_client_secret
+   GOOGLE_REDIRECT_URI=http://localhost:5173/google-drive/callback
+   ```
+3. Run database migration: `cd backend && alembic upgrade head`
 
-1. **Test Claude AI Features** - After configuring API key
-2. **Tag Management UI** - Add/edit/assign tags to content blocks
-3. **Delete/Archive Functionality** - Implement soft delete UI
-4. **Word Document Import** - Use python-docx to import existing proposals
-5. **Proposal Builder** - Interface for assembling proposals from content blocks
-6. **Semantic Search** - Qdrant integration for intelligent content search
+### 📋 Next Steps
+
+**High Priority:**
+1. **Word Document Import** - Import existing proposals (export already implemented)
+2. **Semantic Search** - Qdrant integration for intelligent content discovery
+3. **User Authentication** - Multi-user support with role-based access
+
+**Future Enhancements:**
+- Collaboration features (comments, suggestions)
+- Advanced analytics and reporting
+- Template management system
+- Integration with additional cloud storage providers
 
 ## Development Notes
 
@@ -239,14 +321,34 @@ npm run dev
 ### Backend
 - Main app: `backend/app/main.py`
 - Config: `backend/app/core/config.py`
-- Content API: `backend/app/api/content.py`
-- Claude service: `backend/app/services/claude_service.py`
+- Database models: `backend/app/models/`
+- API endpoints:
+  - Content: `backend/app/api/content.py`
+  - Proposals: `backend/app/api/proposals.py`
+  - Google Drive: `backend/app/api/google_drive.py`
+- Services:
+  - Claude AI: `backend/app/services/claude_service.py`
+  - Google Drive: `backend/app/services/google_drive_service.py`
+- Database migrations: `backend/alembic/versions/`
+- Tests: `backend/tests/`
 
 ### Frontend
-- Repository page: `frontend/src/pages/repository/RepositoryPage.tsx`
-- Content editor: `frontend/src/components/ContentEditorModal.tsx`
-- Rich text editor: `frontend/src/components/common/RichTextEditor.tsx`
-- Content service: `frontend/src/services/contentService.ts`
+- Pages:
+  - Repository: `frontend/src/pages/repository/RepositoryPage.tsx`
+  - Proposal Builder: `frontend/src/pages/proposal/ProposalPage.tsx`
+  - Google Drive Callback: `frontend/src/pages/GoogleDriveCallback.tsx`
+- Components:
+  - Content Editor: `frontend/src/components/ContentEditorModal.tsx`
+  - Content Search: `frontend/src/components/ContentSearchModal.tsx`
+  - Section Content: `frontend/src/components/SectionContentModal.tsx`
+  - Google Drive Connect: `frontend/src/components/GoogleDriveConnect.tsx`
+  - Google Drive Suggestions: `frontend/src/components/GoogleDriveSuggestions.tsx`
+  - Rich Text Editor: `frontend/src/components/common/RichTextEditor.tsx`
+- Services:
+  - Content: `frontend/src/services/contentService.ts`
+  - Proposals: `frontend/src/services/proposalService.ts`
+  - Google Drive: `frontend/src/services/googleDriveService.ts`
+- Security: `frontend/src/utils/sanitizer.ts`
 
 ## Troubleshooting
 
@@ -254,6 +356,33 @@ npm run dev
 1. Verify `ANTHROPIC_API_KEY` is set in `backend/.env`
 2. Backend must be restarted after adding API key
 3. Check backend logs for API errors
+
+### Google Drive integration issues
+
+**"Google OAuth credentials not configured" error:**
+- Ensure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set in `backend/.env`
+- Restart the backend server after adding credentials
+- See `GOOGLE_DRIVE_SETUP.md` for complete setup instructions
+
+**OAuth callback not working:**
+- Verify redirect URI in Google Cloud Console matches: `http://localhost:5173/google-drive/callback`
+- Ensure frontend is running on port 5173
+- Check browser console for error messages
+
+**"Failed to search Google Drive" error:**
+- Verify you're connected to Google Drive (check connection status)
+- Ensure Google Drive API is enabled in your GCP project
+- Token may have expired - disconnect and reconnect
+
+**No files found in search:**
+- Try different search terms
+- Verify you have documents in your Google Drive
+- Search supports: Google Docs, PDFs, Word documents, and presentations
+
+### Database migration issues
+- Run `cd backend && alembic current` to check current migration
+- Run `cd backend && alembic upgrade head` to apply all migrations
+- If migrations fail, check database connection in `.env`
 
 ### CORS errors
 Frontend URL must be in CORS_ORIGINS (default includes localhost:5173-5175)
