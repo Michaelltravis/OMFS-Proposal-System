@@ -14,7 +14,18 @@
       "Bash(ping:*)",
       "Bash(python:*)",
       "Bash(timeout 5 bash:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(git merge:*)",
+      "Bash(npm install)",
+      "Bash(alembic upgrade:*)",
+      "Bash(alembic heads:*)",
+      "Bash(findstr:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(git rm:*)",
+      "Bash(git pull:*)",
+      "Bash(git push:*)",
+      "Bash(pip install:*)"
     ],
     "deny": [],
     "ask": []

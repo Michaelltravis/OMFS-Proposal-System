@@ -16,7 +16,6 @@ interface ContentEditorModalProps {
 
 export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModalProps) => {
   const [title, setTitle] = useState(block?.title || '');
-  const [sectionType, setSectionType] = useState(block?.section_type || 'technical_approach');
   const [content, setContent] = useState(block?.content || '');
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>(
     block?.tags?.map((tag) => tag.id) || []
@@ -33,14 +32,6 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
   const [newSectionTypeName, setNewSectionTypeName] = useState('');
   const [newSectionTypeDisplayName, setNewSectionTypeDisplayName] = useState('');
   const [newSectionTypeDescription, setNewSectionTypeDescription] = useState('');
-
-  const sectionTypes = [
-    { value: 'technical_approach', label: 'Technical Approach' },
-    { value: 'past_performance', label: 'Past Performance' },
-    { value: 'executive_summary', label: 'Executive Summary' },
-    { value: 'qualifications', label: 'Qualifications' },
-    { value: 'pricing', label: 'Pricing' },
-  ];
 
   useEffect(() => {
     fetchSectionTypes();
@@ -95,7 +86,7 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
 
       const data = {
         title,
-        section_type: sectionType,
+        section_type: 'general', // Default value for backward compatibility
         content,
         quality_rating: block?.quality_rating || 3.0,
         tag_ids: selectedTagIds,
@@ -136,7 +127,7 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
       // Call Claude AI backend
       const response = await contentService.generateContentWithAI({
         action,
-        section_type: sectionType,
+        section_type: 'general',
         prompt: claudePrompt,
         existing_content: action !== 'draft' ? content : undefined,
       });
@@ -186,24 +177,6 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
                   placeholder="Enter content block title..."
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
-              </div>
-
-              {/* Section Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Section Type *
-                </label>
-                <select
-                  value={sectionType}
-                  onChange={(e) => setSectionType(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  {sectionTypes.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               {/* Section Type Labels */}

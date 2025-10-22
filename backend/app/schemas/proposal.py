@@ -87,6 +87,7 @@ class ProposalSectionResponse(ProposalSectionBase):
     proposal_id: int
     current_pages: Optional[float] = None
     status: SectionStatus
+    contents: List["ProposalContentResponse"] = []
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -163,3 +164,7 @@ class RFPRequirementResponse(RFPRequirementBase):
 
     class Config:
         from_attributes = True
+
+
+# Resolve forward references
+ProposalSectionResponse.model_rebuild()

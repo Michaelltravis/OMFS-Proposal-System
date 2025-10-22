@@ -185,6 +185,7 @@ export interface ProposalNote {
 export interface SearchParams {
   query?: string;
   section_type?: string;
+  section_type_id?: number;
   tags?: string[];
   client_type?: string;
   facility_type?: string;

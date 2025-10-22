@@ -25,7 +25,7 @@ def upgrade():
         sa.Column('description', sa.Text(), nullable=True),
         sa.Column('color', sa.String(length=20), nullable=True),
         sa.Column('usage_count', sa.Integer(), nullable=True, server_default='0'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_section_types_id'), 'section_types', ['id'], unique=False)

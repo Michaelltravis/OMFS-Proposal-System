@@ -3,7 +3,7 @@ Proposal Builder API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from app.core.database import get_db
 from app.models.proposal import (
@@ -153,17 +153,56 @@ def archive_proposal(proposal_id: int, db: Session = Depends(get_db)):
 # Proposal Sections
 @router.get("/{proposal_id}/sections", response_model=List[ProposalSectionResponse])
 def get_sections(proposal_id: int, db: Session = Depends(get_db)):
-    """Get all sections for a proposal"""
+    """Get all sections for a proposal with their contents"""
     # Verify proposal exists
     proposal = db.query(Proposal).filter(Proposal.id == proposal_id).first()
     if not proposal:
         raise HTTPException(status_code=404, detail="Proposal not found")
 
-    sections = db.query(ProposalSection).filter(
+    sections = db.query(ProposalSection).options(
+        joinedload(ProposalSection.contents)
+    ).filter(
         ProposalSection.proposal_id == proposal_id
     ).order_by(ProposalSection.order).all()
 
-    return sections
+    # Explicitly convert to response models to ensure contents are included
+    result = []
+    for section in sections:
+        section_dict = {
+            "id": section.id,
+            "proposal_id": section.proposal_id,
+            "title": section.title,
+            "section_type": section.section_type,
+            "order": section.order,
+            "page_target_min": section.page_target_min,
+            "page_target_max": section.page_target_max,
+            "current_pages": section.current_pages,
+            "status": section.status,
+            "notes": section.notes,
+            "requirements": section.requirements,
+            "created_at": section.created_at,
+            "updated_at": section.updated_at,
+            "contents": [
+                {
+                    "id": content.id,
+                    "section_id": content.section_id,
+                    "source_block_id": content.source_block_id,
+                    "is_custom": content.is_custom,
+                    "content": content.content,
+                    "title": content.title,
+                    "order": content.order,
+                    "word_count": content.word_count,
+                    "estimated_pages": content.estimated_pages,
+                    "customization_notes": content.customization_notes,
+                    "created_at": content.created_at,
+                    "updated_at": content.updated_at,
+                }
+                for content in section.contents
+            ]
+        }
+        result.append(section_dict)
+
+    return result
 
 
 @router.post("/{proposal_id}/sections", response_model=ProposalSectionResponse, status_code=201)

@@ -27,7 +27,7 @@ export const Layout = () => {
                   <Folder className="w-4 h-4" />
                   Content Library
                 </NavLink>
-                <NavLink to="/proposals" className={navLinkClass}>
+                <NavLink to="/proposals/1" className={navLinkClass}>
                   <FileText className="w-4 h-4" />
                   Proposal Builder
                 </NavLink>
