@@ -2,7 +2,7 @@
  * Google Drive API Service
  * Handles authentication and file operations with Google Drive
  */
-import apiClient from './api';
+import { apiClient } from './api';
 import {
   GoogleDriveAuthUrl,
   GoogleDriveStatus,
