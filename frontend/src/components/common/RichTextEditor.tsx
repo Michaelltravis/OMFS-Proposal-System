@@ -29,6 +29,7 @@ interface RichTextEditorProps {
   onChange: (html: string) => void;
   placeholder?: string;
   editable?: boolean;
+  onEditorReady?: (editor: Editor) => void;
 }
 
 const MenuBar = ({ editor }: { editor: Editor | null }) => {
@@ -176,6 +177,7 @@ export const RichTextEditor = ({
   onChange,
   placeholder: _placeholder = 'Start typing...',
   editable = true,
+  onEditorReady,
 }: RichTextEditorProps) => {
   const editor = useEditor({
     extensions: [
@@ -202,6 +204,13 @@ export const RichTextEditor = ({
       },
     },
   });
+
+  // Notify parent when editor is ready
+  useEffect(() => {
+    if (editor && onEditorReady) {
+      onEditorReady(editor);
+    }
+  }, [editor, onEditorReady]);
 
   // Update content when prop changes
   useEffect(() => {

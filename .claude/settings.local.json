@@ -30,7 +30,9 @@
       "Bash(git log:*)",
       "WebFetch(domain:github.com)",
       "Bash(test:*)",
-      "Bash(alembic revision:*)"
+      "Bash(alembic revision:*)",
+      "Bash(pip show:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

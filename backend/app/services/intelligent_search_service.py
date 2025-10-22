@@ -45,6 +45,16 @@ class IntelligentSearchService:
         Returns:
             Interpreted query with keywords and search strategy
         """
+        # Check if API key is configured
+        if not settings.ANTHROPIC_API_KEY:
+            logger.warning("ANTHROPIC_API_KEY not configured, using basic search")
+            return {
+                "keywords": query.split(),
+                "intent": query,
+                "section_suggestions": [],
+                "enhanced_query": query
+            }
+
         system_message = """You are an expert at understanding proposal content search queries.
 Your job is to interpret user queries and extract:
 1. Key search terms and keywords

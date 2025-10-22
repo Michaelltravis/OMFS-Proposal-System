@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, PanelRightClose, PanelRightOpen, Sparkles, Loader2 } from 'lucide-react';
 import { RichTextEditor } from './common/RichTextEditor';
 import { GoogleDriveSuggestions } from './GoogleDriveSuggestions';
@@ -6,6 +6,7 @@ import { GoogleDriveConnect } from './GoogleDriveConnect';
 import { IntelligentContentSearch } from './IntelligentContentSearch';
 import { intelligentSearchService } from '../services/intelligentSearchService';
 import type { GoogleDriveFile } from '../types';
+import type { Editor } from '@tiptap/react';
 
 interface SectionContentModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export const SectionContentModal: React.FC<SectionContentModalProps> = ({
   const [isGoogleDriveConnected, setIsGoogleDriveConnected] = useState(false);
   const [useIntelligentSearch, setUseIntelligentSearch] = useState(true);
   const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const editorRef = useRef<Editor | null>(null);
 
   if (!isOpen) return null;
 
@@ -47,9 +49,20 @@ export const SectionContentModal: React.FC<SectionContentModalProps> = ({
   };
 
   const handleAppendContent = (newContent: string, source: string) => {
-    // Append content with source attribution
-    const attribution = `\n<!-- Source: ${source} -->\n`;
-    setContent(content + attribution + newContent + '\n');
+    // Insert content at cursor position with source attribution
+    const attribution = `<!-- Source: ${source} -->`;
+
+    if (editorRef.current) {
+      // Insert at cursor position using TipTap editor
+      editorRef.current
+        .chain()
+        .focus()
+        .insertContent(`${attribution}${newContent}`)
+        .run();
+    } else {
+      // Fallback: append to end if editor not available
+      setContent(content + `\n${attribution}\n${newContent}\n`);
+    }
   };
 
   const handleCleanup = async () => {
@@ -122,6 +135,7 @@ export const SectionContentModal: React.FC<SectionContentModalProps> = ({
                 content={content}
                 onChange={setContent}
                 placeholder="Start writing your content here..."
+                onEditorReady={(editor) => { editorRef.current = editor; }}
               />
             </div>
 
