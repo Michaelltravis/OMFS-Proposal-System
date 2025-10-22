@@ -195,12 +195,34 @@ class GoogleDriveService:
             "connected": True,
             "user_email": user_info.get("emailAddress"),
             "expires_at": credential.expiry,
+            "folder_id": credential.folder_id,
         }
 
     @staticmethod
     def disconnect(db: Session) -> None:
         """Disconnect Google Drive by deactivating credentials"""
         db.query(GoogleDriveCredential).update({"is_active": False})
+        db.commit()
+
+    @staticmethod
+    def set_folder_id(db: Session, folder_id: Optional[str]) -> None:
+        """
+        Set the folder ID to restrict searches
+
+        Args:
+            db: Database session
+            folder_id: Google Drive folder ID (None to search all folders)
+        """
+        credential = (
+            db.query(GoogleDriveCredential)
+            .filter(GoogleDriveCredential.is_active == True)
+            .first()
+        )
+
+        if not credential:
+            raise ValueError("Google Drive not connected")
+
+        credential.folder_id = folder_id
         db.commit()
 
     @staticmethod
@@ -226,6 +248,14 @@ class GoogleDriveService:
         if not creds:
             raise ValueError("Google Drive not connected")
 
+        # Get folder_id from credentials if set
+        credential = (
+            db.query(GoogleDriveCredential)
+            .filter(GoogleDriveCredential.is_active == True)
+            .first()
+        )
+        folder_id = credential.folder_id if credential else None
+
         try:
             service = build("drive", "v3", credentials=creds)
 
@@ -246,6 +276,10 @@ class GoogleDriveService:
 
             mime_query = " or ".join([f"mimeType='{mime}'" for mime in mime_types])
             full_query = f"fullText contains '{search_query}' and ({mime_query})"
+
+            # Add folder constraint if folder_id is set
+            if folder_id:
+                full_query += f" and '{folder_id}' in parents"
 
             # Execute search
             results = (

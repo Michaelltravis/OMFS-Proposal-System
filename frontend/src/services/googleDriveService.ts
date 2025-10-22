@@ -61,6 +61,15 @@ export const googleDriveService = {
       `${BASE_URL}/file/${fileId}/content`
     );
   },
+
+  /**
+   * Set folder ID to restrict searches
+   */
+  setFolder: async (folderId: string | null): Promise<{ message: string }> => {
+    return apiClient.put<{ message: string }>(`${BASE_URL}/folder`, {
+      folder_id: folderId,
+    });
+  },
 };
 
 export default googleDriveService;

@@ -23,6 +23,7 @@ class GoogleDriveCredential(Base):
     client_secret = Column(String, nullable=True)
     scopes = Column(Text, nullable=True)  # JSON string of scopes
     expiry = Column(DateTime, nullable=True)
+    folder_id = Column(String, nullable=True)  # Optional: Restrict searches to this folder
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

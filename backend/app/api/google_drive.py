@@ -77,6 +77,28 @@ def disconnect(db: Session = Depends(get_db)):
     return {"message": "Google Drive disconnected successfully"}
 
 
+@router.put("/folder")
+def set_folder(
+    folder_data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Set the Google Drive folder to search within
+
+    Args:
+        folder_data: Dictionary with folder_id (can be None to search all folders)
+        db: Database session
+
+    Returns:
+        Success message
+    """
+    try:
+        GoogleDriveService.set_folder_id(db, folder_data.get("folder_id"))
+        return {"message": "Folder setting updated successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/search", response_model=GoogleDriveSearchResponse)
 def search_files(
     search_request: GoogleDriveSearchRequest, db: Session = Depends(get_db)

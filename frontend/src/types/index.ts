@@ -245,6 +245,7 @@ export interface GoogleDriveStatus {
   connected: boolean;
   user_email?: string;
   expires_at?: string;
+  folder_id?: string;
 }
 
 export interface GoogleDriveFile {
