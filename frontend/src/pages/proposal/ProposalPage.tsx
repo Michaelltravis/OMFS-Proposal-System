@@ -3,7 +3,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router';
-import { Download, FileText, Loader2, MessageSquare, ChevronDown, ChevronUp, Plus, Library, Edit2, Trash2, GripVertical } from 'lucide-react';
+import { Download, FileText, Loader2, MessageSquare, ChevronDown, ChevronUp, Plus, Library, Edit2, Trash2, GripVertical, Maximize2, Minimize2 } from 'lucide-react';
 import { proposalService } from '../../services/proposalService';
 import { contentService } from '../../services/contentService';
 import { ContentSearchModal } from '../../components/ContentSearchModal';
@@ -28,6 +28,7 @@ export const ProposalPage = () => {
   const [editingContent, setEditingContent] = useState<{ sectionId: number; contentId: number; content: string; title?: string } | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editMode, setEditMode] = useState<'visual' | 'html'>('visual');
+  const [isEditModalFullscreen, setIsEditModalFullscreen] = useState(false);
   const [showSectionContentModal, setShowSectionContentModal] = useState(false);
   const [creatingContentForSection, setCreatingContentForSection] = useState<ProposalSection | null>(null);
 
@@ -535,14 +536,17 @@ export const ProposalPage = () => {
         {/* Edit Content Modal */}
         {showEditModal && editingContent && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+            <div className={`bg-white rounded-lg shadow-xl flex flex-col transition-all ${
+              isEditModalFullscreen ? 'w-screen h-screen m-0' : 'max-w-4xl w-full mx-4 max-h-[90vh]'
+            }`}>
               <div className="p-6 flex-1 overflow-auto">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-semibold text-gray-900">
                     Edit Content
                   </h3>
-                  {/* Mode Toggle */}
-                  <div className="flex bg-gray-100 rounded-lg p-1">
+                  <div className="flex items-center gap-3">
+                    {/* Mode Toggle */}
+                    <div className="flex bg-gray-100 rounded-lg p-1">
                     <button
                       onClick={() => setEditMode('visual')}
                       className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -563,6 +567,15 @@ export const ProposalPage = () => {
                     >
                       HTML
                     </button>
+                  </div>
+                  {/* Fullscreen Toggle */}
+                  <button
+                    onClick={() => setIsEditModalFullscreen(!isEditModalFullscreen)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    title={isEditModalFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                  >
+                    {isEditModalFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+                  </button>
                   </div>
                 </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, PanelRightClose, PanelRightOpen, Sparkles, Loader2 } from 'lucide-react';
+import { X, PanelRightClose, PanelRightOpen, Sparkles, Loader2, Maximize2, Minimize2 } from 'lucide-react';
 import { RichTextEditor } from './common/RichTextEditor';
 import { GoogleDriveSuggestions } from './GoogleDriveSuggestions';
 import { GoogleDriveConnect } from './GoogleDriveConnect';
@@ -30,6 +30,7 @@ export const SectionContentModal: React.FC<SectionContentModalProps> = ({
   const [isGoogleDriveConnected, setIsGoogleDriveConnected] = useState(false);
   const [useIntelligentSearch, setUseIntelligentSearch] = useState(true);
   const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const editorRef = useRef<Editor | null>(null);
 
   if (!isOpen) return null;
@@ -94,8 +95,10 @@ export const SectionContentModal: React.FC<SectionContentModalProps> = ({
         />
 
         {/* Modal */}
-        <div className={`relative bg-white rounded-lg shadow-xl w-full max-h-[90vh] flex flex-col transition-all ${
-          showSuggestions ? 'max-w-7xl' : 'max-w-4xl'
+        <div className={`relative bg-white rounded-lg shadow-xl flex flex-col transition-all ${
+          isFullscreen
+            ? 'w-screen h-screen m-0'
+            : `w-full max-h-[90vh] ${showSuggestions ? 'max-w-7xl' : 'max-w-4xl'}`
         }`}>
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -114,6 +117,14 @@ export const SectionContentModal: React.FC<SectionContentModalProps> = ({
                 title={showSuggestions ? 'Hide search panel' : 'Show search panel'}
               >
                 {showSuggestions ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}
+              </button>
+
+              <button
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              >
+                {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
               </button>
 
               <button

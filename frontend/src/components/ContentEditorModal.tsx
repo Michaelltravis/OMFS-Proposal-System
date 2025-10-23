@@ -2,7 +2,7 @@
  * Content Editor Modal - Create and edit content blocks with Claude AI assistance
  */
 import { useState, useEffect } from 'react';
-import { X, Sparkles, Loader2, Save, Plus, Tag as TagIcon } from 'lucide-react';
+import { X, Sparkles, Loader2, Save, Plus, Tag as TagIcon, Maximize2, Minimize2 } from 'lucide-react';
 import { RichTextEditor } from './common/RichTextEditor';
 import { TagPicker } from './TagPicker';
 import { contentService } from '../services/contentService';
@@ -32,6 +32,7 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
   const [newSectionTypeName, setNewSectionTypeName] = useState('');
   const [newSectionTypeDisplayName, setNewSectionTypeDisplayName] = useState('');
   const [newSectionTypeDescription, setNewSectionTypeDescription] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     fetchSectionTypes();
@@ -146,18 +147,29 @@ export const ContentEditorModal = ({ block, onClose, onSave }: ContentEditorModa
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col">
+      <div className={`bg-white rounded-lg shadow-xl flex flex-col transition-all ${
+        isFullscreen ? 'w-screen h-screen m-0' : 'w-full max-w-6xl max-h-[95vh]'
+      }`}>
         {/* Modal Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900">
             {block ? 'Edit Content Block' : 'Create New Content Block'}
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="text-gray-400 hover:text-gray-600"
+              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            >
+              {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Content */}

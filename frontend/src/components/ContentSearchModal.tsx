@@ -2,7 +2,7 @@
  * Content Search Modal - Browse and select content blocks from the library
  */
 import { useState } from 'react';
-import { Search, X, Filter, Check, Eye } from 'lucide-react';
+import { Search, X, Filter, Check, Eye, Maximize2, Minimize2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { contentService } from '../services/contentService';
 import type { ContentBlock, Tag, SectionType } from '../types';
@@ -21,6 +21,7 @@ export function ContentSearchModal({ isOpen, onClose, onAddContent, sectionId }:
   const [selectedBlocks, setSelectedBlocks] = useState<Set<number>>(new Set());
   const [previewBlock, setPreviewBlock] = useState<ContentBlock | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Fetch content blocks
   const { data: blocksData, isLoading: loadingBlocks } = useQuery({
@@ -101,7 +102,9 @@ export function ContentSearchModal({ isOpen, onClose, onAddContent, sectionId }:
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[85vh] flex flex-col">
+      <div className={`bg-white rounded-lg shadow-xl flex flex-col transition-all ${
+        isFullscreen ? 'w-screen h-screen m-0' : 'w-full max-w-6xl h-[85vh]'
+      }`}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
@@ -110,12 +113,21 @@ export function ContentSearchModal({ isOpen, onClose, onAddContent, sectionId }:
               Search and select content blocks to add to this section
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            >
+              {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Search and Filter Bar */}
