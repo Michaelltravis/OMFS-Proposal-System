@@ -84,6 +84,16 @@ This system provides a content repository for storing, organizing, and reusing p
 - **HTTP Client:** Axios
 - **Build Tool:** Vite
 
+### MCP Integration (Model Context Protocol)
+- **MCP Server:** Google Gemini File Search integration
+- **SDK:** @google/genai (official Google GenAI SDK)
+- **Features:**
+  - Upload documents to Gemini (PDF, DOCX, TXT, JSON, code files)
+  - RAG-powered search with vector embeddings
+  - Automatic citations in responses
+  - File management (list, get, delete)
+- **Documentation:** See [`mcp-gemini-file-search/README.md`](mcp-gemini-file-search/README.md)
+
 ## Setup Instructions
 
 ### Prerequisites
